@@ -6,7 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "FX Pip Pioneers <44025218-fxpippioneers@users.noreply.replit.com>",
   "license": "ISC",
   "dependencies": {
     "discord.js": "^14.20.0",
