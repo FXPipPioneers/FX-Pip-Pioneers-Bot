@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, REST, Routes } = require('discord.js');
 const express = require('express');
 const config = require('./config');
 const entryCommand = require('./commands/entry');
+const statsCommand = require('./commands/stats');
 
 const client = new Client({
     intents: [
@@ -15,72 +16,8 @@ const client = new Client({
 const rest = new REST({ version: '10' }).setToken(config.token);
 
 const commands = [
-    {
-        name: 'entry',
-        description: 'Create a trading signal entry',
-        options: [
-            {
-                name: 'type',
-                description: 'Type of entry',
-                type: 3, // STRING
-                required: true,
-                choices: [
-                    { name: 'Buy limit', value: 'buy_limit' },
-                    { name: 'Sell limit', value: 'sell_limit' },
-                    { name: 'Buy execution', value: 'buy_execution' },
-                    { name: 'Sell execution', value: 'sell_execution' }
-                ]
-            },
-            {
-                name: 'pair',
-                description: 'Trading pair',
-                type: 3, // STRING
-                required: true,
-                choices: [
-                    { name: 'XAUUSD', value: 'XAUUSD' },
-                    { name: 'GBPJPY', value: 'GBPJPY' },
-                    { name: 'USDJPY', value: 'USDJPY' },
-                    { name: 'GBPUSD', value: 'GBPUSD' },
-                    { name: 'EURUSD', value: 'EURUSD' },
-                    { name: 'AUDUSD', value: 'AUDUSD' },
-                    { name: 'NZDUSD', value: 'NZDUSD' },
-                    { name: 'US100', value: 'US100' },
-                    { name: 'US500', value: 'US500' },
-                    { name: 'Other', value: 'other' }
-                ]
-            },
-            {
-                name: 'price',
-                description: 'Entry price (e.g., 2995.50 or 1.2345)',
-                type: 10, // NUMBER (allows decimals)
-                required: true
-            },
-            {
-                name: 'channels',
-                description: 'Mention channels to send signal to (e.g., #channel1 #channel2)',
-                type: 3, // STRING
-                required: true
-            },
-            {
-                name: 'roles',
-                description: 'Roles to tag at the bottom (e.g., @signal alert @traders)',
-                type: 3, // STRING
-                required: true
-            },
-            {
-                name: 'custom_pair',
-                description: 'Custom trading pair (only when "Other" is selected)',
-                type: 3, // STRING
-                required: false
-            },
-            {
-                name: 'decimals',
-                description: 'Number of decimals for custom pair (only when "Other" is selected)',
-                type: 4, // INTEGER
-                required: false
-            }
-        ]
-    }
+    entryCommand.data.toJSON(),
+    statsCommand.data.toJSON()
 ];
 
 async function deployCommands() {
@@ -126,6 +63,8 @@ client.on('interactionCreate', async (interaction) => {
     
     if (interaction.commandName === 'entry') {
         await entryCommand.execute(interaction);
+    } else if (interaction.commandName === 'stats') {
+        await statsCommand.execute(interaction);
     }
 });
 
