@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: discord-trading-bot
+    env: python
+    buildCommand: pip install discord.py python-dotenv
+    startCommand: python main.py
+    envVars:
+      - key: DISCORD_TOKEN_PART1
+        sync: false
+      - key: DISCORD_TOKEN_PART2
+        sync: false
+      - key: DISCORD_CLIENT_ID_PART1
+        sync: false
+      - key: DISCORD_CLIENT_ID_PART2
+        sync: false
