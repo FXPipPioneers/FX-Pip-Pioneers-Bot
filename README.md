@@ -70,12 +70,12 @@ python main.py
 
 ### 2. Render.com Configuration
 1. Connect your GitHub repository to Render.com
-2. **Create a new "Background Worker"** (not Web Service)
+2. **Create a new "Web Service"** (FREE tier available)
 3. Use these settings:
 
 **Build Command:**
 ```
-pip install discord.py python-dotenv
+pip install discord.py python-dotenv aiohttp
 ```
 
 **Start Command:**

@@ -4,6 +4,7 @@ from discord import app_commands
 import os
 from dotenv import load_dotenv
 import asyncio
+from aiohttp import web
 
 # Load environment variables
 load_dotenv()
@@ -141,7 +142,7 @@ Stop Loss: {levels['sl']}"""
                 if role:
                     role_mentions.append(role.mention)
                 else:
-                    role_mentions.append(f"{role_name}")
+                    role_mentions.append(f"@{role_name}")
             
             if role_mentions:
                 signal_message += f"\n\n{' '.join(role_mentions)}"
@@ -248,7 +249,7 @@ async def stats_command(
 • TP3 Hits: **{tp3_hits}** ({tp3_percent})
 
 **:octagonal_sign: STOP LOSS**
-• SL Hits: **{sl_hits}** ({sl_percent})
+• SL Hits (70 pips): **{sl_hits}** ({sl_percent})
 
 **:bar_chart: PERFORMANCE SUMMARY**
 • **Win Rate:** {winrate}
@@ -304,15 +305,45 @@ async def on_application_command_error(interaction: discord.Interaction, error: 
         await interaction.response.send_message(f"❌ An error occurred: {str(error)}", ephemeral=True)
     print(f"Application command error: {error}")
 
-# Run the bot
-if __name__ == "__main__":
+# Simple web server for Render.com health checks
+async def health_check(request):
+    return web.Response(text="Discord Trading Bot is running!", status=200)
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    app.router.add_get('/health', health_check)
+    
+    # Use PORT environment variable or default to 5000
+    port = int(os.getenv('PORT', 5000))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    print(f"Web server started on port {port}")
+
+async def start_bot():
     if not DISCORD_TOKEN:
         print("❌ Discord token not found. Please check your environment variables.")
-        exit(1)
+        return
     
     try:
-        bot.run(DISCORD_TOKEN)
+        await bot.start(DISCORD_TOKEN)
     except discord.LoginFailure:
         print("❌ Invalid Discord token. Please check your token parts in environment variables.")
     except Exception as e:
         print(f"❌ Failed to start bot: {e}")
+
+async def main():
+    # Start both the web server and Discord bot
+    await asyncio.gather(
+        start_web_server(),
+        start_bot()
+    )
+
+# Run the bot
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped.")
