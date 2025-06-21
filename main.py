@@ -243,9 +243,9 @@ async def stats_command(
 • Currently Open: **{currently_open}**
 
 **:dart: TAKE PROFIT PERFORMANCE**
-• TP1 Hits: **{tp1_hits}** ({tp1_percent})
-• TP2 Hits: **{tp2_hits}** ({tp2_percent})
-• TP3 Hits: **{tp3_hits}** ({tp3_percent})
+• TP1 Hits: **{tp1_hits}**
+• TP2 Hits: **{tp2_hits}**
+• TP3 Hits: **{tp3_hits}**
 
 **:octagonal_sign: STOP LOSS**
 • SL Hits: **{sl_hits}** ({sl_percent})
