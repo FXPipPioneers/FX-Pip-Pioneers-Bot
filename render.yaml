@@ -1,5 +1,5 @@
 services:
-  - type: web
+  - type: worker
     name: discord-trading-bot
     env: python
     buildCommand: pip install discord.py python-dotenv
