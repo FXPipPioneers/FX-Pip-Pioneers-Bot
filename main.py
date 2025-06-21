@@ -253,7 +253,7 @@ async def stats_command(
 **:bar_chart: PERFORMANCE SUMMARY**
 • **Win Rate:** {tp1_percent}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-**Note:** These stats show where each of our signals peaked. For example, if TP1 shows 19 hits, TP2 shows 16, and TP3 shows 14; that means 14 trades reached all three TP levels, while 2 others reversed to breakeven after hitting TP2, and 3 others reversed after hitting TP1. The amount noted at SL hits indicates how many trades didn't hit any of our TP levels but instead hit SL."""
+
         
         # Parse channel mentions/IDs
         channel_list = [ch.strip() for ch in channels.split(',')]
