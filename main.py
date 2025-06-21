@@ -252,7 +252,7 @@ async def stats_command(
 
 **:bar_chart: PERFORMANCE SUMMARY**
 • **Win Rate:** {tp1_percent}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
 
         
         # Parse channel mentions/IDs
