@@ -225,7 +225,7 @@ async def stats_command(
         def calc_percentage(hits, total):
             if total == 0:
                 return "0%"
-            return f"{(hits/total)*100:.1f}%"
+            return f"{(hits/total)*100:.0f}%"
         
         tp1_percent = calc_percentage(tp1_hits, total_closed) if total_closed > 0 else "0%"
         tp2_percent = calc_percentage(tp2_hits, total_closed) if total_closed > 0 else "0%"
