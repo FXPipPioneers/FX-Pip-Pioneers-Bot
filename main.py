@@ -142,7 +142,7 @@ Stop Loss: {levels['sl']}"""
                 if role:
                     role_mentions.append(role.mention)
                 else:
-                    role_mentions.append(f"@{role_name}")
+                    role_mentions.append(f"{role_name}")
             
             if role_mentions:
                 signal_message += f"\n\n{' '.join(role_mentions)}"
@@ -249,7 +249,7 @@ async def stats_command(
 • TP3 Hits: **{tp3_hits}** ({tp3_percent})
 
 **:octagonal_sign: STOP LOSS**
-• SL Hits (70 pips): **{sl_hits}** ({sl_percent})
+• SL Hits: **{sl_hits}** ({sl_percent})
 
 **:bar_chart: PERFORMANCE SUMMARY**
 • **Win Rate:** {winrate}
