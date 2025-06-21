@@ -210,7 +210,6 @@ async def stats_command(
     tp2_hits: int,
     tp3_hits: int,
     sl_hits: int,
-    winrate: str,
     channels: str,
     currently_open: str = "0",
     total_closed: int = None
@@ -225,13 +224,13 @@ async def stats_command(
         # Calculate percentages
         def calc_percentage(hits, total):
             if total == 0:
-                return "0.0%"
+                return "0%"
             return f"{(hits/total)*100:.1f}%"
         
-        tp1_percent = calc_percentage(tp1_hits, total_closed) if total_closed > 0 else "0.0%"
-        tp2_percent = calc_percentage(tp2_hits, total_closed) if total_closed > 0 else "0.0%"
-        tp3_percent = calc_percentage(tp3_hits, total_closed) if total_closed > 0 else "0.0%"
-        sl_percent = calc_percentage(sl_hits, total_closed) if total_closed > 0 else "0.0%"
+        tp1_percent = calc_percentage(tp1_hits, total_closed) if total_closed > 0 else "0%"
+        tp2_percent = calc_percentage(tp2_hits, total_closed) if total_closed > 0 else "0%"
+        tp3_percent = calc_percentage(tp3_hits, total_closed) if total_closed > 0 else "0%"
+        sl_percent = calc_percentage(sl_hits, total_closed) if total_closed > 0 else "0%"
         
         # Create the stats message
         stats_message = f"""**:bar_chart: TRADING SIGNAL STATISTICS**
@@ -252,7 +251,7 @@ async def stats_command(
 • SL Hits: **{sl_hits}** ({sl_percent})
 
 **:bar_chart: PERFORMANCE SUMMARY**
-• **Win Rate:** {winrate}
+• **Win Rate:** {tp1_percent}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 **Note:** These stats show where each of our signals peaked. For example, if TP1 shows 19 hits, TP2 shows 16, and TP3 shows 14; that means 14 trades reached all three TP levels, while 2 others reversed to breakeven after hitting TP2, and 3 others reversed after hitting TP1. The amount noted at SL hits indicates how many trades didn't hit any of our TP levels but instead hit SL."""
         
