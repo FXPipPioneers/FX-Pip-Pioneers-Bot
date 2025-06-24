@@ -68,7 +68,7 @@ PAIR_CONFIG = {
     'AUDNZD': {'decimals': 4, 'pip_value': 0.0001}   # Same as GBPUSD
 }
 
-def calculate_levels(entry_price: float, pair: str, entry_type: str, custom_decimals: int = None):
+def calculate_levels(entry_price: float, pair: str, entry_type: str):
     """Calculate TP and SL levels based on pair configuration"""
     if pair in PAIR_CONFIG:
         pip_value = PAIR_CONFIG[pair]['pip_value']
@@ -122,24 +122,22 @@ def calculate_levels(entry_price: float, pair: str, entry_type: str, custom_deci
     entry_type="Type of entry (Long, Short, Long Swing, Short Swing)",
     pair="Trading pair",
     price="Entry price",
-    channel="Select the channel to send the signal to",
-    roles="Roles to mention (comma-separated, optional)",
-    custom_decimals="Custom decimal places for unknown pairs (optional)"
+    channels="Select channels to send the signal to (comma-separated channel mentions or names)",
+    roles="Roles to mention (comma-separated, required)"
 )
 async def entry_command(
     interaction: discord.Interaction,
     entry_type: str,
     pair: str,
     price: float,
-    channel: discord.TextChannel,
-    roles: str = "",
-    custom_decimals: int = None
+    channels: str,
+    roles: str
 ):
     """Create and send a trading signal to specified channels"""
     
     try:
         # Calculate TP and SL levels
-        levels = calculate_levels(price, pair, entry_type, custom_decimals)
+        levels = calculate_levels(price, pair, entry_type)
         
         # Create the signal message
         signal_message = f"""**Trade Signal For: {pair}**
@@ -172,14 +170,37 @@ Stop Loss: {levels['sl']}"""
             if role_mentions:
                 signal_message += f"\n\n{' '.join(role_mentions)}"
         
-        # Send signal to the selected channel
-        try:
-            await channel.send(signal_message)
-            await interaction.response.send_message(f"✅ Signal sent to #{channel.name}!", ephemeral=True)
-        except discord.Forbidden:
-            await interaction.response.send_message(f"❌ No permission to send messages in #{channel.name}", ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Error sending to #{channel.name}: {str(e)}", ephemeral=True)
+        # Parse and send to multiple channels
+        channel_list = [ch.strip() for ch in channels.split(',')]
+        sent_channels = []
+        
+        for channel_identifier in channel_list:
+            target_channel = None
+            
+            # Try to parse as channel mention
+            if channel_identifier.startswith('<#') and channel_identifier.endswith('>'):
+                channel_id = int(channel_identifier[2:-1])
+                target_channel = bot.get_channel(channel_id)
+            # Try to parse as channel ID
+            elif channel_identifier.isdigit():
+                target_channel = bot.get_channel(int(channel_identifier))
+            # Try to find by name
+            else:
+                target_channel = discord.utils.get(interaction.guild.channels, name=channel_identifier)
+            
+            if target_channel and isinstance(target_channel, discord.TextChannel):
+                try:
+                    await target_channel.send(signal_message)
+                    sent_channels.append(target_channel.name)
+                except discord.Forbidden:
+                    await interaction.followup.send(f"❌ No permission to send to #{target_channel.name}", ephemeral=True)
+                except Exception as e:
+                    await interaction.followup.send(f"❌ Error sending to #{target_channel.name}: {str(e)}", ephemeral=True)
+        
+        if sent_channels:
+            await interaction.response.send_message(f"✅ Signal sent to: {', '.join(sent_channels)}", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ No valid channels found or no messages sent.", ephemeral=True)
             
     except Exception as e:
         await interaction.response.send_message(f"❌ Error creating signal: {str(e)}", ephemeral=True)
@@ -194,7 +215,21 @@ async def entry_type_autocomplete(interaction: discord.Interaction, current: str
 
 @entry_command.autocomplete('pair')
 async def pair_autocomplete(interaction: discord.Interaction, current: str):
-    pairs = ['XAUUSD', 'GBPJPY', 'GBPUSD', 'EURUSD', 'AUDUSD', 'NZDUSD', 'US100', 'US500', 'GER40', 'BTCUSD', 'GBPCHF', 'USDCHF', 'CADCHF', 'AUDCHF', 'CHFJPY', 'CADJPY', 'AUDJPY', 'USDCAD', 'GBPCAD', 'EURCAD', 'AUDCAD', 'AUDNZD']
+    # Organized pairs by currency groups for easier navigation
+    pairs = [
+        # USD pairs
+        'EURUSD', 'GBPUSD', 'AUDUSD', 'NZDUSD', 'USDCAD', 'USDCHF', 'XAUUSD', 'BTCUSD',
+        # JPY pairs  
+        'GBPJPY', 'CHFJPY', 'CADJPY', 'AUDJPY',
+        # CHF pairs
+        'GBPCHF', 'CADCHF', 'AUDCHF',
+        # CAD pairs
+        'GBPCAD', 'EURCAD', 'AUDCAD',
+        # Cross pairs
+        'AUDNZD',
+        # Indices
+        'US100', 'US500', 'GER40'
+    ]
     return [
         app_commands.Choice(name=pair, value=pair)
         for pair in pairs if current.lower() in pair.lower()
@@ -208,7 +243,7 @@ async def pair_autocomplete(interaction: discord.Interaction, current: str):
     tp2_hits="Number of TP2 hits", 
     tp3_hits="Number of TP3 hits",
     sl_hits="Number of SL hits",
-    channel="Select the channel to send the stats to",
+    channels="Select channels to send the stats to (comma-separated channel mentions or names)",
     currently_open="Number of currently open trades",
     total_closed="Total closed trades (auto-calculated if not provided)"
 )
@@ -220,7 +255,7 @@ async def stats_command(
     tp2_hits: int,
     tp3_hits: int,
     sl_hits: int,
-    channel: discord.TextChannel,
+    channels: str,
     currently_open: str = "0",
     total_closed: int = None
 ):
@@ -264,14 +299,37 @@ async def stats_command(
 • **Win Rate:** {tp1_percent}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"""
         
-        # Send stats to the selected channel
-        try:
-            await channel.send(stats_message)
-            await interaction.response.send_message(f"✅ Stats sent to #{channel.name}!", ephemeral=True)
-        except discord.Forbidden:
-            await interaction.response.send_message(f"❌ No permission to send messages in #{channel.name}", ephemeral=True)
-        except Exception as e:
-            await interaction.response.send_message(f"❌ Error sending to #{channel.name}: {str(e)}", ephemeral=True)
+        # Parse and send to multiple channels
+        channel_list = [ch.strip() for ch in channels.split(',')]
+        sent_channels = []
+        
+        for channel_identifier in channel_list:
+            target_channel = None
+            
+            # Try to parse as channel mention
+            if channel_identifier.startswith('<#') and channel_identifier.endswith('>'):
+                channel_id = int(channel_identifier[2:-1])
+                target_channel = bot.get_channel(channel_id)
+            # Try to parse as channel ID
+            elif channel_identifier.isdigit():
+                target_channel = bot.get_channel(int(channel_identifier))
+            # Try to find by name
+            else:
+                target_channel = discord.utils.get(interaction.guild.channels, name=channel_identifier)
+            
+            if target_channel and isinstance(target_channel, discord.TextChannel):
+                try:
+                    await target_channel.send(stats_message)
+                    sent_channels.append(target_channel.name)
+                except discord.Forbidden:
+                    await interaction.followup.send(f"❌ No permission to send to #{target_channel.name}", ephemeral=True)
+                except Exception as e:
+                    await interaction.followup.send(f"❌ Error sending to #{target_channel.name}: {str(e)}", ephemeral=True)
+        
+        if sent_channels:
+            await interaction.response.send_message(f"✅ Stats sent to: {', '.join(sent_channels)}", ephemeral=True)
+        else:
+            await interaction.response.send_message("❌ No valid channels found or no messages sent.", ephemeral=True)
             
     except Exception as e:
         await interaction.response.send_message(f"❌ Error sending statistics: {str(e)}", ephemeral=True)
