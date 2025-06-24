@@ -378,6 +378,10 @@ async def role_command(
             await interaction.response.send_message(f"❌ You don't have permission to assign role {options.name}", ephemeral=True)
             return
         
+        # Ensure we have all members loaded (for large servers)
+        if not interaction.guild.chunked:
+            await interaction.guild.chunk()
+        
         # Get all members and filter based on criteria
         eligible_members = []
         debug_counts = {
@@ -390,53 +394,72 @@ async def role_command(
             'eligible': 0
         }
         
+        # Track detailed member info for debugging
+        member_details = []
+        
         for member in interaction.guild.members:
             debug_counts['total_members'] += 1
+            member_info = f"{member.display_name} ({'bot' if member.bot else 'human'}, {member.status})"
             
             # Skip bots
             if member.bot:
                 debug_counts['bots_skipped'] += 1
+                member_details.append(f"❌ {member_info} - Bot skipped")
                 continue
             
             # Skip if member already has the target role
             if options in member.roles:
                 debug_counts['already_has_role'] += 1
+                member_details.append(f"❌ {member_info} - Already has role")
                 continue
             
             # Check included role requirement
             if included and included not in member.roles:
                 debug_counts['missing_included'] += 1
+                member_details.append(f"❌ {member_info} - Missing required role '{included.name}'")
                 continue
             
             # Check excluded role restriction
             if excluded and excluded in member.roles:
                 debug_counts['has_excluded'] += 1
+                member_details.append(f"❌ {member_info} - Has excluded role '{excluded.name}'")
                 continue
             
             # Check status filter
-            if status.lower() == 'online' and member.status == discord.Status.offline:
+            if status.lower() == 'online' and member.status in [discord.Status.offline, discord.Status.invisible]:
                 debug_counts['wrong_status'] += 1
+                member_details.append(f"❌ {member_info} - Wrong status (need online)")
                 continue
-            elif status.lower() == 'offline' and member.status != discord.Status.offline:
+            elif status.lower() == 'offline' and member.status not in [discord.Status.offline, discord.Status.invisible]:
                 debug_counts['wrong_status'] += 1
+                member_details.append(f"❌ {member_info} - Wrong status (need offline)")
                 continue
             # For 'both', we include everyone regardless of status
             
             eligible_members.append(member)
             debug_counts['eligible'] += 1
+            member_details.append(f"✅ {member_info} - Eligible")
         
         # Check if we have enough eligible members
         if len(eligible_members) == 0:
             debug_msg = f"❌ No eligible members found matching the criteria\n\n**Debug Info:**\n"
             debug_msg += f"• Total members: {debug_counts['total_members']}\n"
             debug_msg += f"• Bots skipped: {debug_counts['bots_skipped']}\n"
-            debug_msg += f"• Already have target role: {debug_counts['already_has_role']}\n"
+            debug_msg += f"• Already have target role '{options.name}': {debug_counts['already_has_role']}\n"
             if included:
                 debug_msg += f"• Missing required role '{included.name}': {debug_counts['missing_included']}\n"
             if excluded:
                 debug_msg += f"• Have excluded role '{excluded.name}': {debug_counts['has_excluded']}\n"
             debug_msg += f"• Wrong status (need {status}): {debug_counts['wrong_status']}\n"
-            debug_msg += f"• **Eligible members: {debug_counts['eligible']}**"
+            debug_msg += f"• **Eligible members: {debug_counts['eligible']}**\n\n"
+            
+            # Add detailed member breakdown (limit to first 10 to avoid message length issues)
+            if member_details:
+                debug_msg += "**Member Details:**\n"
+                for detail in member_details[:10]:
+                    debug_msg += f"{detail}\n"
+                if len(member_details) > 10:
+                    debug_msg += f"... and {len(member_details) - 10} more members"
             
             await interaction.response.send_message(debug_msg, ephemeral=True)
             return
