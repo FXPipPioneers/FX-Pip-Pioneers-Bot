@@ -317,11 +317,24 @@ async def start_bot():
         print(f"❌ Failed to start bot: {e}")
 
 async def main():
-    # Start both the web server and Discord bot
-    await asyncio.gather(
-        start_web_server(),
-        start_bot()
-    )
+    # Start web server first (required for Render.com)
+    print("Starting web server...")
+    web_task = asyncio.create_task(start_web_server())
+    
+    # Wait a moment for web server to initialize
+    await asyncio.sleep(1)
+    
+    # Start Discord bot (don't let it crash the web server)
+    print("Starting Discord bot...")
+    bot_task = asyncio.create_task(start_bot())
+    
+    # Keep both running, but prioritize web server for Render
+    try:
+        await asyncio.gather(web_task, bot_task, return_exceptions=True)
+    except Exception as e:
+        print(f"Error in main: {e}")
+        # Keep web server running even if bot fails
+        await web_task
 
 # Run the bot
 if __name__ == "__main__":
