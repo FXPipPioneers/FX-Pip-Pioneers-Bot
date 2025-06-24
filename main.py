@@ -380,36 +380,65 @@ async def role_command(
         
         # Get all members and filter based on criteria
         eligible_members = []
+        debug_counts = {
+            'total_members': 0,
+            'bots_skipped': 0,
+            'already_has_role': 0,
+            'missing_included': 0,
+            'has_excluded': 0,
+            'wrong_status': 0,
+            'eligible': 0
+        }
         
         for member in interaction.guild.members:
+            debug_counts['total_members'] += 1
+            
             # Skip bots
             if member.bot:
+                debug_counts['bots_skipped'] += 1
                 continue
             
             # Skip if member already has the target role
             if options in member.roles:
+                debug_counts['already_has_role'] += 1
                 continue
             
             # Check included role requirement
             if included and included not in member.roles:
+                debug_counts['missing_included'] += 1
                 continue
             
             # Check excluded role restriction
             if excluded and excluded in member.roles:
+                debug_counts['has_excluded'] += 1
                 continue
             
             # Check status filter
             if status.lower() == 'online' and member.status == discord.Status.offline:
+                debug_counts['wrong_status'] += 1
                 continue
             elif status.lower() == 'offline' and member.status != discord.Status.offline:
+                debug_counts['wrong_status'] += 1
                 continue
             # For 'both', we include everyone regardless of status
             
             eligible_members.append(member)
+            debug_counts['eligible'] += 1
         
         # Check if we have enough eligible members
         if len(eligible_members) == 0:
-            await interaction.response.send_message("❌ No eligible members found matching the criteria", ephemeral=True)
+            debug_msg = f"❌ No eligible members found matching the criteria\n\n**Debug Info:**\n"
+            debug_msg += f"• Total members: {debug_counts['total_members']}\n"
+            debug_msg += f"• Bots skipped: {debug_counts['bots_skipped']}\n"
+            debug_msg += f"• Already have target role: {debug_counts['already_has_role']}\n"
+            if included:
+                debug_msg += f"• Missing required role '{included.name}': {debug_counts['missing_included']}\n"
+            if excluded:
+                debug_msg += f"• Have excluded role '{excluded.name}': {debug_counts['has_excluded']}\n"
+            debug_msg += f"• Wrong status (need {status}): {debug_counts['wrong_status']}\n"
+            debug_msg += f"• **Eligible members: {debug_counts['eligible']}**"
+            
+            await interaction.response.send_message(debug_msg, ephemeral=True)
             return
         
         # Limit to requested amount
