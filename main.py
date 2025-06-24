@@ -334,6 +334,147 @@ async def stats_command(
     except Exception as e:
         await interaction.response.send_message(f"❌ Error sending statistics: {str(e)}", ephemeral=True)
 
+@bot.tree.command(name="role", description="Assign roles to members based on criteria")
+@app_commands.describe(
+    options="Select the role to give to members",
+    amount="Number of people to give the role to",
+    status="Member status filter (online, offline, or both)",
+    included="Required role - only give role to members who have this role (optional)",
+    excluded="Excluded role - don't give role to members who have this role (optional)"
+)
+async def role_command(
+    interaction: discord.Interaction,
+    options: discord.Role,
+    amount: int,
+    status: str,
+    included: discord.Role = None,
+    excluded: discord.Role = None
+):
+    """Assign a role to specified number of members based on criteria"""
+    
+    try:
+        # Validate status parameter
+        if status.lower() not in ['online', 'offline', 'both']:
+            await interaction.response.send_message("❌ Status must be 'online', 'offline', or 'both'", ephemeral=True)
+            return
+        
+        # Validate amount
+        if amount <= 0:
+            await interaction.response.send_message("❌ Amount must be greater than 0", ephemeral=True)
+            return
+        
+        # Check bot permissions
+        if not interaction.guild.me.guild_permissions.manage_roles:
+            await interaction.response.send_message("❌ Bot doesn't have permission to manage roles", ephemeral=True)
+            return
+        
+        # Check if bot can assign this role (role hierarchy)
+        if options.position >= interaction.guild.me.top_role.position:
+            await interaction.response.send_message(f"❌ Cannot assign role {options.name} - it's higher than bot's highest role", ephemeral=True)
+            return
+        
+        # Check if user has permission to assign this role
+        if options.position >= interaction.user.top_role.position and interaction.user.id != interaction.guild.owner_id:
+            await interaction.response.send_message(f"❌ You don't have permission to assign role {options.name}", ephemeral=True)
+            return
+        
+        # Get all members and filter based on criteria
+        eligible_members = []
+        
+        for member in interaction.guild.members:
+            # Skip bots
+            if member.bot:
+                continue
+            
+            # Skip if member already has the target role
+            if options in member.roles:
+                continue
+            
+            # Check included role requirement
+            if included and included not in member.roles:
+                continue
+            
+            # Check excluded role restriction
+            if excluded and excluded in member.roles:
+                continue
+            
+            # Check status filter
+            if status.lower() == 'online' and member.status == discord.Status.offline:
+                continue
+            elif status.lower() == 'offline' and member.status != discord.Status.offline:
+                continue
+            # For 'both', we include everyone regardless of status
+            
+            eligible_members.append(member)
+        
+        # Check if we have enough eligible members
+        if len(eligible_members) == 0:
+            await interaction.response.send_message("❌ No eligible members found matching the criteria", ephemeral=True)
+            return
+        
+        # Limit to requested amount
+        selected_members = eligible_members[:amount]
+        
+        # Assign roles
+        successful_assignments = []
+        failed_assignments = []
+        
+        await interaction.response.defer(ephemeral=True)
+        
+        for member in selected_members:
+            try:
+                await member.add_roles(options, reason=f"Role assignment via /role command by {interaction.user}")
+                successful_assignments.append(member.display_name)
+            except discord.Forbidden:
+                failed_assignments.append(f"{member.display_name} (no permission)")
+            except discord.HTTPException as e:
+                failed_assignments.append(f"{member.display_name} (error: {str(e)})")
+        
+        # Create response message
+        response_parts = []
+        
+        if successful_assignments:
+            response_parts.append(f"✅ Successfully assigned role **{options.name}** to {len(successful_assignments)} members:")
+            response_parts.append(f"• {', '.join(successful_assignments)}")
+        
+        if failed_assignments:
+            response_parts.append(f"\n❌ Failed to assign role to {len(failed_assignments)} members:")
+            response_parts.append(f"• {', '.join(failed_assignments)}")
+        
+        # Add summary
+        response_parts.append(f"\n**Summary:**")
+        response_parts.append(f"• Target role: {options.name}")
+        response_parts.append(f"• Requested amount: {amount}")
+        response_parts.append(f"• Status filter: {status}")
+        if included:
+            response_parts.append(f"• Required role: {included.name}")
+        if excluded:
+            response_parts.append(f"• Excluded role: {excluded.name}")
+        response_parts.append(f"• Eligible members found: {len(eligible_members)}")
+        response_parts.append(f"• Successfully assigned: {len(successful_assignments)}")
+        
+        # Split response if too long
+        response_text = '\n'.join(response_parts)
+        if len(response_text) > 2000:
+            # Send summary first
+            summary = f"✅ Role assignment completed!\n**{options.name}** assigned to {len(successful_assignments)}/{amount} requested members"
+            if failed_assignments:
+                summary += f"\n❌ {len(failed_assignments)} assignments failed"
+            await interaction.followup.send(summary, ephemeral=True)
+        else:
+            await interaction.followup.send(response_text, ephemeral=True)
+            
+    except Exception as e:
+        await interaction.followup.send(f"❌ Error during role assignment: {str(e)}", ephemeral=True)
+
+@role_command.autocomplete('status')
+async def status_autocomplete(interaction: discord.Interaction, current: str):
+    statuses = ['online', 'offline', 'both']
+    return [
+        app_commands.Choice(name=status, value=status)
+        for status in statuses if current.lower() in status.lower()
+    ]
+
 # Error handling
 @bot.event
 async def on_command_error(ctx, error):
