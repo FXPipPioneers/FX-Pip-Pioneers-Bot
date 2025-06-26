@@ -104,22 +104,6 @@ SL_MESSAGES = [
     "@everyone SL tagged. The next setup could be the win that makes the week 🔍📊"
 ]
 
-# MetaTrader 5 integration - Cloud-based connection
-MT5_ENABLED = False
-MT5_CREDENTIALS = {
-    'login': None,
-    'password': None,
-    'server': 'MetaQuotes-Demo'
-}
-
-try:
-    import MetaTrader5 as mt5
-    MT5_ENABLED = True
-    print("MetaTrader5 module available")
-except ImportError:
-    print("MetaTrader5 not available on this platform. Using cloud MT5 simulation.")
-    mt5 = None
-
 # Cloud MT5 simulation for when actual MT5 isn't available
 class CloudMT5Simulator:
     def __init__(self):
@@ -219,10 +203,24 @@ class CloudMT5Simulator:
     def last_error(self):
         return (0, "No error")
 
+# MetaTrader 5 integration - Cloud-based connection
+MT5_ENABLED = True  # Always enabled for cloud simulation
+MT5_CREDENTIALS = {
+    'login': None,
+    'password': None,
+    'server': 'MetaQuotes-Demo'
+}
+
+try:
+    import MetaTrader5 as mt5
+    print("MetaTrader5 module available")
+except ImportError:
+    print("MetaTrader5 not available on this platform. Using cloud MT5 simulation.")
+    mt5 = None
+
 # Initialize cloud simulator if MT5 not available
-if not MT5_ENABLED or mt5 is None:
+if mt5 is None:
     mt5 = CloudMT5Simulator()
-    MT5_ENABLED = True  # Enable simulated MT5
     print("Using MT5 cloud simulation")
 
 # Trading pair configurations
@@ -647,19 +645,22 @@ Stop Loss: {levels['sl']}"""
                     'sl_hit': False
                 }
                 
-                # Place MT5 trade if enabled
-                if MT5_ENABLED:
-                    await connect_mt5()
-                    mt5_order_id = await place_mt5_trade(
-                        pair=pair,
-                        entry_price=levels['entry_raw'],
-                        tp3_price=levels['tp3_raw'],
-                        sl_price=levels['sl_raw'],
-                        entry_type=entry_type
-                    )
-                    if mt5_order_id:
-                        signal_data['mt5_order_id'] = mt5_order_id
-                        print(f"MT5 trade placed for {pair}: Order #{mt5_order_id}")
+                # Place MT5 trade if enabled and credentials are set
+                if MT5_ENABLED and MT5_CREDENTIALS['login'] and MT5_CREDENTIALS['password']:
+                    connection_success = await connect_mt5()
+                    if connection_success:
+                        mt5_order_id = await place_mt5_trade(
+                            pair=pair,
+                            entry_price=levels['entry_raw'],
+                            tp3_price=levels['tp3_raw'],
+                            sl_price=levels['sl_raw'],
+                            entry_type=entry_type
+                        )
+                        if mt5_order_id:
+                            signal_data['mt5_order_id'] = mt5_order_id
+                            print(f"MT5 trade placed for {pair}: Order #{mt5_order_id}")
+                    else:
+                        print(f"MT5 connection failed - trade not placed for {pair}")
                 
                 # Store in active signals for monitoring
                 active_signals[primary_message.id] = signal_data
@@ -865,33 +866,58 @@ async def signals_command(interaction: discord.Interaction):
         
         signals_list = "**📊 Active Signals:**\n\n"
         
+        # Clean up completed trades first
+        completed_signals = []
+        for message_id, signal_data in active_signals.items():
+            # Mark as completed if TP3 hit or SL hit
+            if signal_data.get('tp3_hit') or signal_data.get('sl_hit'):
+                completed_signals.append(message_id)
+        
+        # Remove completed signals
+        for message_id in completed_signals:
+            del active_signals[message_id]
+            print(f"Removed completed signal: {message_id}")
+        
+        # Show remaining active signals
+        if not active_signals:
+            await interaction.response.send_message("📊 No active signals being monitored.", ephemeral=True)
+            return
+        
         for message_id, signal_data in active_signals.items():
             pair = signal_data['pair']
             entry_type = signal_data['entry_type']
             entry_price = signal_data['entry_raw']
             
-            status_indicators = []
-            if signal_data.get('tp1_hit'):
-                status_indicators.append("✅ TP1")
-            else:
-                status_indicators.append("⏳ TP1")
-                
-            if signal_data.get('tp2_hit'):
-                status_indicators.append("✅ TP2")
-            else:
-                status_indicators.append("⏳ TP2")
-                
+            # Check if trade is completed
             if signal_data.get('tp3_hit'):
-                status_indicators.append("✅ TP3")
+                status = "✅ COMPLETED (TP3 Hit)"
+            elif signal_data.get('sl_hit'):
+                status = "❌ COMPLETED (SL Hit)"
             else:
-                status_indicators.append("⏳ TP3")
+                status_indicators = []
+                if signal_data.get('tp1_hit'):
+                    status_indicators.append("✅ TP1")
+                else:
+                    status_indicators.append("⏳ TP1")
+                    
+                if signal_data.get('tp2_hit'):
+                    status_indicators.append("✅ TP2")
+                else:
+                    status_indicators.append("⏳ TP2")
+                    
+                if signal_data.get('tp3_hit'):
+                    status_indicators.append("✅ TP3")
+                else:
+                    status_indicators.append("⏳ TP3")
+                
+                status = ' | '.join(status_indicators)
             
             mt5_status = ""
             if signal_data.get('mt5_order_id'):
                 mt5_status = f" 🔄 MT5: #{signal_data['mt5_order_id']}"
             
             signals_list += f"**{pair}** ({entry_type}) @ {entry_price:.5f}{mt5_status}\n"
-            signals_list += f"  {' | '.join(status_indicators)}\n\n"
+            signals_list += f"  {status}\n\n"
         
         signals_list += f"**📈 Market Monitor:** {'🟢 Active' if market_monitor_active else '🔴 Inactive'}"
         
