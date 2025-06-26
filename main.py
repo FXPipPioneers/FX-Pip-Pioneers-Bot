@@ -311,40 +311,29 @@ async def connect_mt5():
     if not MT5_ENABLED:
         return False
     
-    # For cloud simulator
-    if hasattr(mt5, 'initialize'):
-        if MT5_CREDENTIALS['login'] and MT5_CREDENTIALS['password']:
-            success = mt5.initialize()
-            if success:
-                # Login with credentials
-                login_success = mt5.login(
-                    MT5_CREDENTIALS['login'],
-                    MT5_CREDENTIALS['password'], 
-                    MT5_CREDENTIALS['server']
-                )
-                if login_success:
-                    print(f"MT5 connected - Account: {MT5_CREDENTIALS['login']}")
-                    return True
-                else:
-                    print(f"MT5 login failed: {mt5.last_error()}")
-                    return False
-            else:
-                print(f"MT5 initialization failed: {mt5.last_error()}")
-                return False
+    # Check credentials first
+    if not MT5_CREDENTIALS['login'] or not MT5_CREDENTIALS['password']:
+        print("MT5 credentials not set. Use /mt5setup command first.")
+        return False
+    
+    try:
+        # Use cloud simulator - pass credentials directly to initialize
+        success = mt5.initialize(
+            login=MT5_CREDENTIALS['login'],
+            password=MT5_CREDENTIALS['password'],
+            server=MT5_CREDENTIALS['server']
+        )
+        
+        if success:
+            print(f"MT5 connected - Account: {MT5_CREDENTIALS['login']}, Server: {MT5_CREDENTIALS['server']}")
+            return True
         else:
-            print("MT5 credentials not set. Use /mt5setup command first.")
+            print(f"MT5 connection failed for account {MT5_CREDENTIALS['login']} on {MT5_CREDENTIALS['server']}")
             return False
-    else:
-        # Cloud simulator
-        if MT5_CREDENTIALS['login'] and MT5_CREDENTIALS['password']:
-            return mt5.initialize(
-                MT5_CREDENTIALS['login'],
-                MT5_CREDENTIALS['password'],
-                MT5_CREDENTIALS['server']
-            )
-        else:
-            print("MT5 credentials not set. Use /mt5setup command first.")
-            return False
+            
+    except Exception as e:
+        print(f"MT5 connection error: {str(e)}")
+        return False
 
 async def place_mt5_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
     """Place a trade in MetaTrader 5"""
@@ -943,16 +932,20 @@ async def mt5setup_command(
             
             await interaction.response.send_message(success_msg, ephemeral=True)
         else:
+            # More detailed error analysis
+            login_valid = str(login).isdigit() and len(str(login)) >= 6
+            server_valid = "MetaQuotes" in server or "Demo" in server
+            
             error_msg = f"❌ MT5 Connection Failed\n\n"
-            error_msg += f"**Common Issues:**\n"
-            error_msg += f"• **Login Format**: Must be 6+ digits (e.g. 123456789)\n"
-            error_msg += f"• **Password Type**: Use MASTER password, not investor password\n"
-            error_msg += f"• **Server**: Try 'MetaQuotes-Demo' for demo accounts\n"
-            error_msg += f"• **API Trading**: Must be enabled in MT5 settings\n\n"
-            error_msg += f"**Your Input:**\n"
-            error_msg += f"• Login: {login} {'✅' if str(login).isdigit() and len(str(login)) >= 6 else '❌ Invalid format'}\n"
-            error_msg += f"• Server: {server}\n\n"
-            error_msg += f"**Need Help?** Check your MT5 account details and try again."
+            error_msg += f"**For MetaQuotes Demo Accounts:**\n"
+            error_msg += f"• Login: Must be your MT5 account number (6+ digits)\n"
+            error_msg += f"• Password: Your MASTER password (what you use to log into MT5)\n"
+            error_msg += f"• Server: 'MetaQuotes-Demo' (exactly as shown)\n\n"
+            error_msg += f"**Your Input Validation:**\n"
+            error_msg += f"• Login: {login} {'✅ Valid format' if login_valid else '❌ Must be 6+ digits'}\n"
+            error_msg += f"• Server: {server} {'✅' if server_valid else '❌ Try MetaQuotes-Demo'}\n\n"
+            error_msg += f"**Cloud Trading Note:** This system works with demo accounts from MetaQuotes Ltd.\n"
+            error_msg += f"If you have a live account, it may require different server settings."
             
             await interaction.response.send_message(error_msg, ephemeral=True)
             
