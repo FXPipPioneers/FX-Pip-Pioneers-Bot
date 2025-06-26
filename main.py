@@ -466,17 +466,15 @@ async def check_signal_levels(message_id: int, signal_data: dict):
 
 async def get_market_price(pair: str) -> Optional[float]:
     """Get current market price for a trading pair"""
-    if MT5_ENABLED:
-        try:
-            tick = mt5.symbol_info_tick(pair)
-            if tick:
-                return (tick.bid + tick.ask) / 2  # Use mid price
-        except Exception as e:
-            print(f"Error getting MT5 price for {pair}: {e}")
-    
-    # Placeholder for when MT5 is not available
-    # In production, you'd integrate with a price feed API
-    return None
+    try:
+        # For cloud simulation, we need real price data to avoid instant TP/SL hits
+        # Since we're using cloud simulation, market monitoring is disabled
+        # until real MT5 connection or real price feed is available
+        print(f"Market monitoring disabled for cloud simulation - no real price feed available for {pair}")
+        return None
+    except Exception as e:
+        print(f"Error getting price for {pair}: {e}")
+        return None
 
 async def handle_tp_hit(message_id: int, signal_data: dict, tp_level: str):
     """Handle when a TP level is hit"""
@@ -665,15 +663,16 @@ Stop Loss: {levels['sl']}"""
                 # Store in active signals for monitoring
                 active_signals[primary_message.id] = signal_data
                 
-                # Start market monitor if not already running
+                # Market monitoring disabled for cloud simulation
+                # (Would need real price feed to avoid instant TP/SL triggers)
                 global market_monitor_active
-                if not market_monitor_active:
-                    asyncio.create_task(start_market_monitor())
+                market_monitor_active = False
                 
             success_msg = f"✅ Signal sent to: {', '.join(sent_channels)}"
             if sent_messages and MT5_ENABLED and signal_data.get('mt5_order_id'):
-                success_msg += f"\n🔄 MT5 trade placed (Order #{signal_data['mt5_order_id']})"
-            success_msg += f"\n📊 Market monitoring active for {pair}"
+                success_msg += f"\n🔄 MT5 trade simulated (Order #{signal_data['mt5_order_id']}) - Cloud simulation only"
+                success_msg += f"\n⚠️ Note: Real MT5 trading requires actual MetaTrader 5 API connection"
+            success_msg += f"\n📊 Signal tracking active for {pair}"
             
             await interaction.response.send_message(success_msg, ephemeral=True)
         else:
@@ -811,53 +810,10 @@ async def stats_command(
     except Exception as e:
         await interaction.response.send_message(f"❌ Error sending statistics: {str(e)}", ephemeral=True)
 
-@bot.tree.command(name="channels", description="List all channels with their IDs for precise selection")
-async def channels_command(interaction: discord.Interaction):
-    """List all channels with their IDs to help with channel selection"""
-    try:
-        text_channels = [ch for ch in interaction.guild.channels if isinstance(ch, discord.TextChannel)]
-        
-        if not text_channels:
-            await interaction.response.send_message("❌ No text channels found.", ephemeral=True)
-            return
-        
-        # Group channels by name to show duplicates
-        channel_groups = {}
-        for channel in text_channels:
-            if channel.name not in channel_groups:
-                channel_groups[channel.name] = []
-            channel_groups[channel.name].append(channel)
-        
-        channel_list = "**📋 Available Channels:**\n\n"
-        
-        for name, channels in sorted(channel_groups.items()):
-            if len(channels) == 1:
-                channel = channels[0]
-                channel_list += f"• **{name}** - `<#{channel.id}>` (ID: {channel.id})\n"
-            else:
-                channel_list += f"• **{name}** ({len(channels)} channels with same name):\n"
-                for i, channel in enumerate(channels, 1):
-                    channel_list += f"  └ {name} #{i} - `<#{channel.id}>` (ID: {channel.id})\n"
-        
-        channel_list += "\n**💡 Usage Tips:**\n"
-        channel_list += "• Copy the `<#ID>` format for exact channel selection\n"
-        channel_list += "• Use channel IDs when you have multiple channels with same name\n"
-        channel_list += "• Separate multiple channels with commas in /entry command"
-        
-        # Split into multiple messages if too long
-        if len(channel_list) > 2000:
-            chunks = [channel_list[i:i+2000] for i in range(0, len(channel_list), 2000)]
-            await interaction.response.send_message(chunks[0], ephemeral=True)
-            for chunk in chunks[1:]:
-                await interaction.followup.send(chunk, ephemeral=True)
-        else:
-            await interaction.response.send_message(channel_list, ephemeral=True)
-            
-    except Exception as e:
-        await interaction.response.send_message(f"❌ Error listing channels: {str(e)}", ephemeral=True)
 
-@bot.tree.command(name="signals", description="Show active signals being monitored")
-async def signals_command(interaction: discord.Interaction):
+
+@bot.tree.command(name="monitoring", description="Show active signals being monitored")
+async def monitoring_command(interaction: discord.Interaction):
     """Show currently active signals and their status"""
     try:
         if not active_signals:
@@ -1009,198 +965,7 @@ async def mt5status_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.response.send_message(f"❌ Error checking MT5 status: {str(e)}", ephemeral=True)
 
-@bot.tree.command(name="role", description="Assign roles to members based on criteria")
-@app_commands.describe(
-    options="Select the role to give to members",
-    amount="Number of people to give the role to",
-    status="Member status filter (online, offline, or both)",
-    included="Required role - only give role to members who have this role (optional)",
-    excluded="Excluded role - don't give role to members who have this role (optional)"
-)
-async def role_command(
-    interaction: discord.Interaction,
-    options: discord.Role,
-    amount: int,
-    status: str,
-    included: discord.Role = None,
-    excluded: discord.Role = None
-):
-    """Assign a role to specified number of members based on criteria"""
-    
-    try:
-        # Validate status parameter
-        if status.lower() not in ['online', 'offline', 'both']:
-            await interaction.response.send_message("❌ Status must be 'online', 'offline', or 'both'", ephemeral=True)
-            return
-        
-        # Validate amount
-        if amount <= 0:
-            await interaction.response.send_message("❌ Amount must be greater than 0", ephemeral=True)
-            return
-        
-        # Check bot permissions
-        if not interaction.guild.me.guild_permissions.manage_roles:
-            await interaction.response.send_message("❌ Bot doesn't have permission to manage roles", ephemeral=True)
-            return
-        
-        # Check if bot can assign this role (role hierarchy)
-        if options.position >= interaction.guild.me.top_role.position:
-            await interaction.response.send_message(f"❌ Cannot assign role {options.name} - it's higher than bot's highest role", ephemeral=True)
-            return
-        
-        # Check if user has permission to assign this role
-        if options.position >= interaction.user.top_role.position and interaction.user.id != interaction.guild.owner_id:
-            await interaction.response.send_message(f"❌ You don't have permission to assign role {options.name}", ephemeral=True)
-            return
-        
-        # Ensure we have all members loaded (for large servers)
-        if not interaction.guild.chunked:
-            await interaction.guild.chunk()
-        
-        # Get all members and filter based on criteria
-        eligible_members = []
-        debug_counts = {
-            'total_members': 0,
-            'bots_skipped': 0,
-            'already_has_role': 0,
-            'missing_included': 0,
-            'has_excluded': 0,
-            'wrong_status': 0,
-            'eligible': 0
-        }
-        
-        # Track detailed member info for debugging
-        member_details = []
-        
-        for member in interaction.guild.members:
-            debug_counts['total_members'] += 1
-            member_info = f"{member.display_name} ({'bot' if member.bot else 'human'}, {member.status})"
-            
-            # Skip bots
-            if member.bot:
-                debug_counts['bots_skipped'] += 1
-                member_details.append(f"❌ {member_info} - Bot skipped")
-                continue
-            
-            # Skip if member already has the target role
-            if options in member.roles:
-                debug_counts['already_has_role'] += 1
-                member_details.append(f"❌ {member_info} - Already has role")
-                continue
-            
-            # Check included role requirement
-            if included and included not in member.roles:
-                debug_counts['missing_included'] += 1
-                member_details.append(f"❌ {member_info} - Missing required role '{included.name}'")
-                continue
-            
-            # Check excluded role restriction
-            if excluded and excluded in member.roles:
-                debug_counts['has_excluded'] += 1
-                member_details.append(f"❌ {member_info} - Has excluded role '{excluded.name}'")
-                continue
-            
-            # Check status filter
-            if status.lower() == 'online' and member.status in [discord.Status.offline, discord.Status.invisible]:
-                debug_counts['wrong_status'] += 1
-                member_details.append(f"❌ {member_info} - Wrong status (need online)")
-                continue
-            elif status.lower() == 'offline' and member.status not in [discord.Status.offline, discord.Status.invisible]:
-                debug_counts['wrong_status'] += 1
-                member_details.append(f"❌ {member_info} - Wrong status (need offline)")
-                continue
-            # For 'both', we include everyone regardless of status
-            
-            eligible_members.append(member)
-            debug_counts['eligible'] += 1
-            member_details.append(f"✅ {member_info} - Eligible")
-        
-        # Check if we have enough eligible members
-        if len(eligible_members) == 0:
-            debug_msg = f"❌ No eligible members found matching the criteria\n\n**Debug Info:**\n"
-            debug_msg += f"• Total members: {debug_counts['total_members']}\n"
-            debug_msg += f"• Bots skipped: {debug_counts['bots_skipped']}\n"
-            debug_msg += f"• Already have target role '{options.name}': {debug_counts['already_has_role']}\n"
-            if included:
-                debug_msg += f"• Missing required role '{included.name}': {debug_counts['missing_included']}\n"
-            if excluded:
-                debug_msg += f"• Have excluded role '{excluded.name}': {debug_counts['has_excluded']}\n"
-            debug_msg += f"• Wrong status (need {status}): {debug_counts['wrong_status']}\n"
-            debug_msg += f"• **Eligible members: {debug_counts['eligible']}**\n\n"
-            
-            # Add detailed member breakdown (limit to first 10 to avoid message length issues)
-            if member_details:
-                debug_msg += "**Member Details:**\n"
-                for detail in member_details[:10]:
-                    debug_msg += f"{detail}\n"
-                if len(member_details) > 10:
-                    debug_msg += f"... and {len(member_details) - 10} more members"
-            
-            await interaction.response.send_message(debug_msg, ephemeral=True)
-            return
-        
-        # Limit to requested amount
-        selected_members = eligible_members[:amount]
-        
-        # Assign roles
-        successful_assignments = []
-        failed_assignments = []
-        
-        await interaction.response.defer(ephemeral=True)
-        
-        for member in selected_members:
-            try:
-                await member.add_roles(options, reason=f"Role assignment via /role command by {interaction.user}")
-                successful_assignments.append(member.display_name)
-            except discord.Forbidden:
-                failed_assignments.append(f"{member.display_name} (no permission)")
-            except discord.HTTPException as e:
-                failed_assignments.append(f"{member.display_name} (error: {str(e)})")
-        
-        # Create response message
-        response_parts = []
-        
-        if successful_assignments:
-            response_parts.append(f"✅ Successfully assigned role **{options.name}** to {len(successful_assignments)} members:")
-            response_parts.append(f"• {', '.join(successful_assignments)}")
-        
-        if failed_assignments:
-            response_parts.append(f"\n❌ Failed to assign role to {len(failed_assignments)} members:")
-            response_parts.append(f"• {', '.join(failed_assignments)}")
-        
-        # Add summary
-        response_parts.append(f"\n**Summary:**")
-        response_parts.append(f"• Target role: {options.name}")
-        response_parts.append(f"• Requested amount: {amount}")
-        response_parts.append(f"• Status filter: {status}")
-        if included:
-            response_parts.append(f"• Required role: {included.name}")
-        if excluded:
-            response_parts.append(f"• Excluded role: {excluded.name}")
-        response_parts.append(f"• Eligible members found: {len(eligible_members)}")
-        response_parts.append(f"• Successfully assigned: {len(successful_assignments)}")
-        
-        # Split response if too long
-        response_text = '\n'.join(response_parts)
-        if len(response_text) > 2000:
-            # Send summary first
-            summary = f"✅ Role assignment completed!\n**{options.name}** assigned to {len(successful_assignments)}/{amount} requested members"
-            if failed_assignments:
-                summary += f"\n❌ {len(failed_assignments)} assignments failed"
-            await interaction.followup.send(summary, ephemeral=True)
-        else:
-            await interaction.followup.send(response_text, ephemeral=True)
-            
-    except Exception as e:
-        await interaction.followup.send(f"❌ Error during role assignment: {str(e)}", ephemeral=True)
 
-@role_command.autocomplete('status')
-async def status_autocomplete(interaction: discord.Interaction, current: str):
-    statuses = ['online', 'offline', 'both']
-    return [
-        app_commands.Choice(name=status, value=status)
-        for status in statuses if current.lower() in status.lower()
-    ]
 
 # Error handling
 @bot.event
