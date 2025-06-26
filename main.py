@@ -137,17 +137,30 @@ class CloudMT5Simulator:
         self.TRADE_RETCODE_DONE = 10009
     
     def initialize(self, login=None, password=None, server=None):
-        if login and password:
-            self.connected = True
-            print(f"Connected to MT5 cloud simulation - Login: {login}, Server: {server}")
-            return True
+        # Simulate MetaQuotes Demo server validation
+        if login and password and server:
+            # Basic validation for demo accounts
+            if str(login).isdigit() and len(str(login)) >= 6:
+                self.connected = True
+                print(f"Connected to MT5 cloud simulation - Login: {login}, Server: {server}")
+                return True
+            else:
+                print(f"Invalid login format: {login}")
+                return False
+        print(f"Missing credentials - Login: {login}, Password: {'***' if password else None}, Server: {server}")
         return False
     
     def login(self, login, password, server):
-        if login and password:
-            self.connected = True
-            print(f"Logged into MT5 - Account: {login}, Server: {server}")
-            return True
+        # Simulate MetaQuotes Demo server login validation
+        if login and password and server:
+            if str(login).isdigit() and len(str(login)) >= 6:
+                self.connected = True
+                print(f"Logged into MT5 - Account: {login}, Server: {server}")
+                return True
+            else:
+                print(f"Login failed - Invalid account format: {login}")
+                return False
+        print(f"Login failed - Missing credentials")
         return False
     
     def order_send(self, request):
@@ -900,8 +913,8 @@ async def signals_command(interaction: discord.Interaction):
 
 @bot.tree.command(name="mt5setup", description="Configure MetaTrader 5 credentials for 24/7 trading")
 @app_commands.describe(
-    login="Your MT5 account login number",
-    password="Your MT5 account password",
+    login="Your MT5 account login number (6+ digits)",
+    password="Your MT5 MASTER password (not investor password)",
     server="MT5 server (default: MetaQuotes-Demo)"
 )
 async def mt5setup_command(
@@ -930,11 +943,16 @@ async def mt5setup_command(
             
             await interaction.response.send_message(success_msg, ephemeral=True)
         else:
-            error_msg = f"❌ MT5 Connection Failed\n"
-            error_msg += f"Please check your credentials:\n"
-            error_msg += f"• Login: {login}\n"
-            error_msg += f"• Server: {server}\n"
-            error_msg += f"• Make sure your account allows API trading"
+            error_msg = f"❌ MT5 Connection Failed\n\n"
+            error_msg += f"**Common Issues:**\n"
+            error_msg += f"• **Login Format**: Must be 6+ digits (e.g. 123456789)\n"
+            error_msg += f"• **Password Type**: Use MASTER password, not investor password\n"
+            error_msg += f"• **Server**: Try 'MetaQuotes-Demo' for demo accounts\n"
+            error_msg += f"• **API Trading**: Must be enabled in MT5 settings\n\n"
+            error_msg += f"**Your Input:**\n"
+            error_msg += f"• Login: {login} {'✅' if str(login).isdigit() and len(str(login)) >= 6 else '❌ Invalid format'}\n"
+            error_msg += f"• Server: {server}\n\n"
+            error_msg += f"**Need Help?** Check your MT5 account details and try again."
             
             await interaction.response.send_message(error_msg, ephemeral=True)
             
