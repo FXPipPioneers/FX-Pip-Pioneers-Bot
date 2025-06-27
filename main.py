@@ -34,9 +34,26 @@ DISCORD_CLIENT_ID_PART1 = os.getenv("DISCORD_CLIENT_ID_PART1", "")
 DISCORD_CLIENT_ID_PART2 = os.getenv("DISCORD_CLIENT_ID_PART2", "")
 DISCORD_CLIENT_ID = DISCORD_CLIENT_ID_PART1 + DISCORD_CLIENT_ID_PART2
 
-# MetaApi configuration for real cloud trading
-METAAPI_TOKEN = os.getenv("METAAPI_TOKEN", "")
-MT5_ACCOUNT_ID = os.getenv("MT5_ACCOUNT_ID", "")
+# MetaApi configuration for real cloud trading - HARDCODED CREDENTIALS
+METAAPI_TOKEN = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiIyOGQ5NzRhMDIzYzE3ODYzMGJjYzBkNTRmNTI5MmM1YyIsImFjY2Vzc1J1bGVzIjpbeyJpZCI6InRyYWRpbmctYWNjb3VudC1tYW5hZ2VtZW50LWFwaSIsIm1ldGhvZHMiOlsidHJhZGluZy1hY2NvdW50LW1hbmFnZW1lbnQtYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiLCJ3cml0ZXIiXSwicmVzb3VyY2VzIjpbIio6JFVTRVJfSUQkOioiXX0seyJpZCI6Im1ldGFhcGktcmVzdC1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiLCJ3cml0ZXIiXSwicmVzb3VyY2VzIjpbIio6JFVTRVJfSUQkOioiXX0seyJpZCI6Im1ldGFhcGktcnBjLWFwaSIsIm1ldGhvZHMiOlsibWV0YWFwaS1hcGk6d3M6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiLCJ3cml0ZXIiXSwicmVzb3VyY2VzIjpbIio6JFVTRVJfSUQkOioiXX0seyJpZCI6Im1ldGFhcGktcmVhbC10aW1lLXN0cmVhbWluZy1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOndzOnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIl0sInJlc291cmNlcyI6WyIqOiRVU0VSX0lEJDoqIl19XSwiaWF0IjoxNzUwOTU3NzI3LCJyZWFsVXNlcklkIjoiMjhkOTc0YTAyM2MxNzg2MzBiY2MwZDU0ZjUyOTJjNWMifQ.QbGvXpDNBe9GDQShXWTJkXs5sCjp8WB-RY3w7NVnRwA4DL_mFoJ8CZV3L1rz68HYSvh3S0-w_J5k9K0mLZzNzKx0o7V1kJPZfAVFLxzUdE1zKz3PjTr6VHNKNl0wL2bTXLKH1Wz1w-zWYy_5z6_gGNx_E8Q_A_cXYzf1Jp1nz3hzEA-F8K8c-K9fKoX8mGq1Lf2R_kz1n0zZA0_4gYZA3_2n"
+MT5_ACCOUNT_ID = "f927bb74-90fc-45ad-96fb-c704f8431f7f"
+
+# Debug: Check if MetaAPI credentials are loaded
+print(f"MetaAPI Token loaded: {len(METAAPI_TOKEN) > 0}")
+print(f"MT5 Account ID loaded: {len(MT5_ACCOUNT_ID) > 0}")
+if len(METAAPI_TOKEN) > 0:
+    print(f"MetaAPI Token preview: {METAAPI_TOKEN[:20]}...")
+else:
+    print(f"MetaAPI Token is empty or None")
+if len(MT5_ACCOUNT_ID) > 0:
+    print(f"MT5 Account ID preview: {MT5_ACCOUNT_ID[:8]}...")
+else:
+    print(f"MT5 Account ID is empty or None")
+
+if METAAPI_TOKEN and MT5_ACCOUNT_ID:
+    print("✅ MetaAPI credentials configured")
+else:
+    print("❌ MetaAPI credentials missing - check environment variables")
 
 
 
