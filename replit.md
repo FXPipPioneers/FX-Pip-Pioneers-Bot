@@ -92,6 +92,8 @@ PAIR_CONFIG = {
 - `DISCORD_TOKEN_PART2`: Second half of Discord bot token
 - `DISCORD_CLIENT_ID_PART1`: First half of Discord client ID
 - `DISCORD_CLIENT_ID_PART2`: Second half of Discord client ID
+- `METAAPI_TOKEN`: MetaAPI cloud token for real trading (required for trade execution)
+- `MT5_ACCOUNT_ID`: MetaTrader 5 account ID connected to MetaAPI (required for trade execution)
 
 ## Deployment Strategy
 
@@ -118,6 +120,9 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+- June 27, 2025: Removed OANDA API integration completely per user request
+- June 27, 2025: MetaAPI now the sole trading integration platform
+- June 27, 2025: Created complete deployment package (discord-trading-bot-latest.tar.gz)
 - June 26, 2025: Implemented MetaTrader 5 integration for automatic trade execution
 - June 26, 2025: Added market monitoring system with automatic TP/SL hit detection
 - June 26, 2025: Fixed channel selection issue for servers with duplicate channel names
