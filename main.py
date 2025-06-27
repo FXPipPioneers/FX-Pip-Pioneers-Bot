@@ -23,8 +23,7 @@ except ImportError:
     METAAPI_AVAILABLE = False
     print("MetaApi Cloud SDK not available - Install with: pip install metaapi-cloud-sdk")
 
-# Import requests for HTTP calls
-import requests
+# Note: requests library removed as it's not used in this bot
 
 # Reconstruct tokens from split parts for enhanced security
 DISCORD_TOKEN_PART1 = os.getenv("DISCORD_TOKEN_PART1", "")
