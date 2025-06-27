@@ -23,10 +23,8 @@ except ImportError:
     METAAPI_AVAILABLE = False
     print("MetaApi Cloud SDK not available - Install with: pip install metaapi-cloud-sdk")
 
-# Import for OANDA API (free alternative)
+# Import requests for HTTP calls
 import requests
-OANDA_AVAILABLE = True
-print("OANDA API ready - Free forex trading enabled")
 
 # Reconstruct tokens from split parts for enhanced security
 DISCORD_TOKEN_PART1 = os.getenv("DISCORD_TOKEN_PART1", "")
@@ -41,18 +39,7 @@ DISCORD_CLIENT_ID = DISCORD_CLIENT_ID_PART1 + DISCORD_CLIENT_ID_PART2
 METAAPI_TOKEN = os.getenv("METAAPI_TOKEN", "")
 MT5_ACCOUNT_ID = os.getenv("MT5_ACCOUNT_ID", "")
 
-# OANDA configuration (free alternative)
-OANDA_API_KEY = os.getenv("OANDA_API_KEY", "")
-OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID", "")
-OANDA_ENVIRONMENT = os.getenv("OANDA_ENVIRONMENT", "practice")  # practice or live
 
-# OANDA API endpoints
-if OANDA_ENVIRONMENT == "live":
-    OANDA_API_URL = "https://api-fxtrade.oanda.com"
-    OANDA_STREAM_URL = "https://stream-fxtrade.oanda.com"
-else:
-    OANDA_API_URL = "https://api-fxpractice.oanda.com"
-    OANDA_STREAM_URL = "https://stream-fxpractice.oanda.com"
 
 # Bot setup with intents
 intents = discord.Intents.default()
@@ -79,25 +66,27 @@ class TradingBot(commands.Bot):
         # Initialize trading APIs
         trading_enabled = False
         
-        # Check OANDA (free option)
-        if OANDA_API_KEY and OANDA_ACCOUNT_ID:
-            print("✅ OANDA configured - FREE REAL TRADING ENABLED")
-            trading_enabled = True
-        
-        # Check MetaApi (paid option)
+        # Check MetaApi connection
         if await initialize_metaapi():
-            print("✅ MetaApi connected - PAID REAL TRADING ENABLED")
+            print("✅ MetaApi connected - REAL TRADING ENABLED")
             trading_enabled = True
-        
-        if not trading_enabled:
-            print("⚠️ No trading APIs configured - using simulation mode")
-            print("💡 Add OANDA_API_KEY + OANDA_ACCOUNT_ID for FREE real trading")
+        else:
+            print("⚠️ MetaApi not configured - using simulation mode")
+            print("💡 Configure METAAPI_TOKEN + MT5_ACCOUNT_ID for real trading")
 
 bot = TradingBot()
 
 # Global storage for active signals and market monitoring
 active_signals = {}  # Format: {message_id: {pair, entry_price, tp1, tp2, tp3, sl, channels, entry_type}}
 market_monitor_active = False
+
+# MT5 configuration
+MT5_ENABLED = True
+MT5_CREDENTIALS = {
+    'login': None,
+    'password': None,
+    'server': 'MetaQuotes-Demo'
+}
 
 # Response messages for different TP/SL hits
 TP1_MESSAGES = [
@@ -292,29 +281,6 @@ async def initialize_metaapi():
         print(f"❌ MetaApi initialization failed: {str(e)}")
         return False
 
-# Fallback to simulation for development
-class CloudMT5Simulator:
-    def __init__(self):
-        self.connected = False
-        
-    def initialize(self, login=None, password=None, server=None):
-        self.connected = True
-        return True
-        
-    def login(self, login, password, server):
-        return True
-        
-    def order_send(self, request):
-        order_id = random.randint(1000, 9999)
-        return type('obj', (object,), {
-            'retcode': 10009,  # Success
-            'comment': f'Simulated order #{order_id}',
-            'order': order_id
-        })()
-        
-    def last_error(self):
-        return (0, "No error")
-
 # Initialize simulation fallback
 mt5_simulator = CloudMT5Simulator()
 print("MetaApi Cloud integration initialized")
@@ -412,7 +378,7 @@ async def connect_mt5():
     
     try:
         # Use cloud simulator - pass credentials directly to initialize
-        success = mt5.initialize(
+        success = mt5_simulator.initialize(
             login=MT5_CREDENTIALS['login'],
             password=MT5_CREDENTIALS['password'],
             server=MT5_CREDENTIALS['server']
@@ -430,17 +396,11 @@ async def connect_mt5():
         return False
 
 async def place_mt5_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
-    """Place a real trade using available APIs (OANDA free, MetaApi paid, or simulation)"""
+    """Place a real trade using MetaAPI or simulation fallback"""
     global mt5_account
     
     try:
-        # Try OANDA first (FREE option)
-        if OANDA_API_KEY and OANDA_ACCOUNT_ID:
-            result = await place_oanda_trade(pair, entry_price, tp3_price, sl_price, entry_type, lot_size)
-            if result:
-                return result
-        
-        # Try MetaApi Cloud (paid option)
+        # Try MetaApi Cloud first
         if mt5_account is not None:
             result = await place_metaapi_trade(pair, entry_price, tp3_price, sl_price, entry_type, lot_size)
             if result:
@@ -491,72 +451,7 @@ async def place_metaapi_trade(pair: str, entry_price: float, tp3_price: float, s
         print(f"❌ MetaApi trade failed: {str(e)}")
         return None
 
-async def place_oanda_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
-    """Execute real trade via OANDA API (FREE)"""
-    if not OANDA_API_KEY or not OANDA_ACCOUNT_ID:
-        return None
-    
-    try:
-        # Convert Discord symbols to OANDA format
-        oanda_symbol = pair.replace("XAUUSD", "XAU_USD").replace("GBPJPY", "GBP_JPY").replace("USDJPY", "USD_JPY")
-        oanda_symbol = oanda_symbol.replace("GBPUSD", "GBP_USD").replace("EURUSD", "EUR_USD").replace("AUDUSD", "AUD_USD")
-        oanda_symbol = oanda_symbol.replace("NZDUSD", "NZD_USD")
-        
-        # Convert lot size to units (OANDA uses units, not lots)
-        units = int(lot_size * 100000)  # 1 lot = 100,000 units
-        
-        # Determine trade direction
-        if entry_type.lower().startswith('sell'):
-            units = -units  # Negative for sell orders
-        
-        headers = {
-            'Authorization': f'Bearer {OANDA_API_KEY}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Create order data
-        order_data = {
-            "order": {
-                "units": str(units),
-                "instrument": oanda_symbol,
-                "timeInForce": "FOK",  # Fill or Kill for market orders
-                "type": "MARKET" if "execution" in entry_type.lower() else "LIMIT",
-                "positionFill": "DEFAULT",
-                "stopLossOnFill": {
-                    "price": str(sl_price)
-                },
-                "takeProfitOnFill": {
-                    "price": str(tp3_price)
-                }
-            }
-        }
-        
-        # Add price for limit orders
-        if "limit" in entry_type.lower():
-            order_data["order"]["price"] = str(entry_price)
-        
-        # Execute trade via OANDA API
-        response = requests.post(
-            f"{OANDA_API_URL}/v3/accounts/{OANDA_ACCOUNT_ID}/orders",
-            headers=headers,
-            json=order_data,
-            timeout=10
-        )
-        
-        if response.status_code == 201:
-            result = response.json()
-            order_id = result.get("orderCreateTransaction", {}).get("id", "unknown")
-            print(f"✅ REAL OANDA TRADE: {entry_type} {oanda_symbol} @ {entry_price}")
-            print(f"   Order ID: {order_id}, Units: {units}")
-            print(f"   TP: {tp3_price}, SL: {sl_price}")
-            return order_id
-        else:
-            print(f"❌ OANDA trade failed: {response.status_code} - {response.text}")
-            return None
-            
-    except Exception as e:
-        print(f"❌ OANDA API error: {str(e)}")
-        return None
+
 
 async def place_simulated_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
     """Simulation fallback when no real APIs available"""
@@ -570,30 +465,13 @@ async def move_sl_to_breakeven(order_id: int, entry_price: float):
         return False
     
     try:
-        # Get position info
-        positions = mt5.positions_get(ticket=order_id)
+        # Get position info using simulator
+        positions = mt5_simulator.positions_get(ticket=order_id)
         if not positions:
             print(f"Position {order_id} not found")
             return False
         
-        position = positions[0]
-        
-        # Create modification request
-        request = {
-            "action": getattr(mt5, 'TRADE_ACTION_SLTP', 2),
-            "symbol": position.symbol,
-            "sl": entry_price,  # Move SL to entry (breakeven)
-            "tp": position.tp,  # Keep existing TP
-            "position": order_id,
-        }
-        
-        result = mt5.order_send(request)
-        
-        if result.retcode != getattr(mt5, 'TRADE_RETCODE_DONE', 10009):
-            print(f"Failed to move SL to breakeven: {result.comment}")
-            return False
-        
-        print(f"SL moved to breakeven for order {order_id}")
+        print(f"SL moved to breakeven for order {order_id} (simulated)")
         return True
         
     except Exception as e:
@@ -657,11 +535,21 @@ async def check_signal_levels(message_id: int, signal_data: dict):
 async def get_market_price(pair: str) -> Optional[float]:
     """Get current market price for a trading pair"""
     try:
-        # For cloud simulation, we need real price data to avoid instant TP/SL hits
-        # Since we're using cloud simulation, market monitoring is disabled
-        # until real MT5 connection or real price feed is available
-        print(f"Market monitoring disabled for cloud simulation - no real price feed available for {pair}")
-        return None
+        # Use MetaAPI for real price data if available
+        if mt5_account is not None:
+            try:
+                connection = mt5_account.get_rpc_connection()
+                symbol = pair.replace("XAUUSD", "GOLD").replace("US100", "NAS100").replace("US500", "SPX500")
+                # Note: MetaAPI price fetching would require specific API call
+                print(f"Would fetch price for {symbol} via MetaAPI")
+                return None  # Market monitoring disabled until proper MetaAPI price feed implementation
+            except Exception as e:
+                print(f"MetaAPI price fetch failed: {e}")
+        
+        # Fallback to simulator price
+        tick = mt5_simulator.symbol_info_tick(pair)
+        return tick.bid if hasattr(tick, 'bid') else None
+        
     except Exception as e:
         print(f"Error getting price for {pair}: {e}")
         return None
@@ -1188,8 +1076,10 @@ async def start_web_server():
 
 async def start_bot():
     """Start the Discord bot"""
-    if not DISCORD_TOKEN:
-        print("Error: DISCORD_TOKEN not found in environment variables")
+    if not DISCORD_TOKEN or len(DISCORD_TOKEN) < 50:
+        print(f"Error: DISCORD_TOKEN invalid - Length: {len(DISCORD_TOKEN)}")
+        print(f"Part1 length: {len(DISCORD_TOKEN_PART1)}, Part2 length: {len(DISCORD_TOKEN_PART2)}")
+        print("Please check DISCORD_TOKEN_PART1 and DISCORD_TOKEN_PART2 environment variables")
         return
     
     await bot.start(DISCORD_TOKEN)
