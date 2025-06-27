@@ -3,7 +3,7 @@ services:
     name: discord-trading-bot
     env: python
     runtime: python-3.11.0
-    buildCommand: pip install discord.py python-dotenv aiohttp metaapi-cloud-sdk requests
+    buildCommand: pip install -r requirements.txt
     startCommand: python main.py
     healthCheckPath: /health
     envVars:
