@@ -720,11 +720,17 @@ Stop Loss: {levels['sl']}"""
                     'sl_hit': False
                 }
                 
-                # Place MT5 trade if enabled and credentials are set
-                if MT5_ENABLED and MT5_CREDENTIALS['login'] and MT5_CREDENTIALS['password']:
-                    connection_success = await connect_mt5()
-                    if connection_success:
-                        mt5_order_id = await place_mt5_trade(
+                # Place real MetaAPI trade if configured
+                if METAAPI_AVAILABLE and METAAPI_TOKEN and MT5_ACCOUNT_ID:
+                    # Initialize MetaAPI connection if not already done
+                    if mt5_account is None:
+                        metaapi_success = await initialize_metaapi()
+                        if not metaapi_success:
+                            print(f"❌ MetaAPI initialization failed - trade not placed for {pair}")
+                    
+                    # Place real trade via MetaAPI
+                    if mt5_account is not None:
+                        mt5_order_id = await place_metaapi_trade(
                             pair=pair,
                             entry_price=levels['entry_raw'],
                             tp3_price=levels['tp3_raw'],
@@ -733,9 +739,13 @@ Stop Loss: {levels['sl']}"""
                         )
                         if mt5_order_id:
                             signal_data['mt5_order_id'] = mt5_order_id
-                            print(f"MT5 trade placed for {pair}: Order #{mt5_order_id}")
+                            print(f"✅ REAL MetaAPI trade placed for {pair}: Order #{mt5_order_id}")
+                        else:
+                            print(f"❌ MetaAPI trade failed for {pair}")
                     else:
-                        print(f"MT5 connection failed - trade not placed for {pair}")
+                        print(f"❌ MetaAPI not connected - trade not placed for {pair}")
+                else:
+                    print(f"⚠️ MetaAPI not configured - add METAAPI_TOKEN and MT5_ACCOUNT_ID")
                 
                 # Store in active signals for monitoring
                 active_signals[primary_message.id] = signal_data
@@ -746,9 +756,13 @@ Stop Loss: {levels['sl']}"""
                 market_monitor_active = False
                 
             success_msg = f"✅ Signal sent to: {', '.join(sent_channels)}"
-            if sent_messages and MT5_ENABLED and signal_data.get('mt5_order_id'):
-                success_msg += f"\n🔄 MT5 trade simulated (Order #{signal_data['mt5_order_id']}) - Cloud simulation only"
-                success_msg += f"\n⚠️ Note: Real MT5 trading requires actual MetaTrader 5 API connection"
+            if sent_messages and signal_data.get('mt5_order_id'):
+                success_msg += f"\n🔄 REAL MetaAPI trade executed (Order #{signal_data['mt5_order_id']})"
+                success_msg += f"\n📈 Live trade placed on MT5 account {MT5_ACCOUNT_ID}"
+            elif METAAPI_AVAILABLE and METAAPI_TOKEN and MT5_ACCOUNT_ID:
+                success_msg += f"\n⚠️ MetaAPI trade failed - check account connection"
+            else:
+                success_msg += f"\n⚠️ MetaAPI not configured - signals only mode"
             success_msg += f"\n📊 Signal tracking active for {pair}"
             
             await interaction.response.send_message(success_msg, ephemeral=True)
