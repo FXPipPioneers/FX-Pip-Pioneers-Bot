@@ -35,7 +35,7 @@ DISCORD_CLIENT_ID_PART2 = os.getenv("DISCORD_CLIENT_ID_PART2", "")
 DISCORD_CLIENT_ID = DISCORD_CLIENT_ID_PART1 + DISCORD_CLIENT_ID_PART2
 
 # MetaApi configuration for real cloud trading - HARDCODED CREDENTIALS
-METAAPI_TOKEN = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiIyOGQ5NzRhMDIzYzE3ODYzMGJjYzBkNTRmNTI5MmM1YyIsImFjY2Vzc1J1bGVzIjpbeyJpZCI6InRyYWRpbmctYWNjb3VudC1tYW5hZ2VtZW50LWFwaSIsIm1ldGhvZHMiOlsidHJhZGluZy1hY2NvdW50LW1hbmFnZW1lbnQtYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiXSwicmVzb3VyY2VzIjpbImFjY291bnQ6JFVTRVJfSUQkOmY5MjdiYjc0LTkwZmMtNDVhZC05NmZiLWM3MDRmODQzMWY3ZiJdfSx7ImlkIjoibWV0YWFwaS1yZXN0LWFwaSIsIm1ldGhvZHMiOlsibWV0YWFwaS1hcGk6cmVzdDpwdWJsaWM6KjoqIl0sInJvbGVzIjpbInJlYWRlciIsIndyaXRlciJdLCJyZXNvdXJjZXMiOlsiYWNjb3VudDokVVNFUl9JRCQ6ZjkyN2JiNzQtOTBmYy00NWFkLTk2ZmItYzcwNGY4NDMxZjdmIl19LHsiaWQiOiJtZXRhYXBpLXJwYy1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOndzOnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyJhY2NvdW50OiRVU0VSX0lEJDpmOTI3YmI3NC05MGZjLTQ1YWQtOTZmYi1jNzA0Zjg0MzFmN2YiXX0seyJpZCI6Im1ldGFhcGktcmVhbC10aW1lLXN0cmVhbWluZy1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOndzOnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyJhY2NvdW50OiRVU0VSX0lEJDpmOTI3YmI3NC05MGZjLTQ1YWQtOTZmYi1jNzA0Zjg0MzFmN2YiXX0seyJpZCI6Im1ldGFzdGF0cy1hcGkiLCJtZXRob2RzIjpbIm1ldGFzdGF0cy1hcGk6cmVzdDpwdWJsaWM6KjoqIl0sInJvbGVzIjpbInJlYWRlciJdLCJyZXNvdXJjZXMiOlsiYWNjb3VudDokVVNFUl9JRCQ6ZjkyN2JiNzQtOTBmYy00NWFkLTk2ZmItYzcwNGY4NDMxZjdmIl19LHsiaWQiOiJyaXNrLW1hbmFnZW1lbnQtYXBpIiwibWV0aG9kcyI6WyJyaXNrLW1hbmFnZW1lbnQtYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiXSwicmVzb3VyY2VzIjpbImFjY291bnQ6JFVTRVJfSUQkOmY5MjdiYjc0LTkwZmMtNDVhZC05NmZiLWM3MDRmODQzMWY3ZiJdfSx7ImlkIjoiY29weWZhY3RvcnktYXBpIiwibWV0aG9kcyI6WyJjb3B5ZmFjdG9yeS1hcGk6cmVzdDpwdWJsaWM6KjoqIl0sInJvbGVzIjpbInJlYWRlciIsIndyaXRlciJdLCJyZXNvdXJjZXMiOlsiKjokVVNFUl9JRCQ6KiJdfSx7ImlkIjoibXQtbWFuYWdlci1hcGkiLCJtZXRob2RzIjpbIm10LW1hbmFnZXItYXBpOnJlc3Q6ZGVhbGluZzoqOioiLCJtdC1tYW5hZ2VyLWFwaTpyZXN0OnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyIqOiRVU0VSX0lEJDoqIl19XSwiaWdub3JlUmF0ZUxpbWl0cyI6ZmFsc2UsInRva2VuSWQiOiIyMDIxMDIxMyIsImltcGVyc29uYXRlZCI6ZmFsc2UsInJlYWxVc2VySWQiOiIyOGQ5NzRhMDIzYzE3ODYzMGJjYzBkNTRmNTI5MmM1YyIsImlhdCI6MTc1MTA2MTYxOX0.Dz_ybyVne9ckFq9rL1czJA7uGnoHuwClK60WZgDSj8BnNp-OvGGbl6aVi4Zp7Fk7hVTxlKI_8Iukbq1yKVPQopUClqdYcjlR5NLu_afNPS-T8EaKLksjS5CR0eCb3LsvhqIhBOjyqf8BG-IgH6aREqjdQiQlog8J7TeCyK0aUgNguBZNHvoRkqM8MNPyfA8GjBC_hJgwO21rDKZqIKOHz2aTv1hrvoFzbfi3ybByAE_4_9gzZdFzQV58F-8msyHi1-NmQ_hOiveI0FT0aJN33wbfdYOMto3zPcI-dJgKOIuOaRDGS57rMVWoOGbIYkqNcOY3QMgKBLTMATZy33BvG1XPbgIJZ1VhJvuRALTJEBcPoUrv7uxDqtwMdlv7CIyxesfogjVtCswyhZsEAeF9cawWPx_DWxABJBuclZCoOP0fZTVsEuOH8iRKnL3IJE_bshLnGyGYbcIdDVZCxcoFjwpSArT7hyzj21B8C0DoS4TBnQg19TOUWI4XoJEaN92Dnh4kg4__eOAmgqi7JuxpLymN5LB2D2ZFyoqMhlv3Z5Gu5UQ6GDta2FNN610kyptrHyiAdaPtxMMG8Rj--Uzs_CFvMMPqnMNjikAvgf2owCc7ODpN1ZhpclhDS3DpJSyq1EZbKgqov0soPg-QxTy_GDeLmqY--E_xu0dx3BaB8po"
+METAAPI_TOKEN = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiIyOGQ5NzRhMDIzYzE3ODYzMGJjYzBkNTRmNTI5MmM1YyIsImFjY2Vzc1J1bGVzIjpbeyJpZCI6InRyYWRpbmctYWNjb3VudC1tYW5hZ2VtZW50LWFwaSIsIm1ldGhvZHMiOlsidHJhZGluZy1hY2NvdW50LW1hbmFnZW1lbnQtYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiXSwicmVzb3VyY2VzIjpbImFjY291bnQ6JFVTRVJfSUQkOmY5MjdiYjc0LTkwZmMtNDVhZC05NmZiLWM3MDRmODQzMWY3ZiJdfSx7ImlkIjoibWV0YWFwaS1yZXN0LWFwaSIsIm1ldGhvZHMiOlsibWV0YWFwaS1hcGk6cmVzdDpwdWJsaWM6KjoqIl0sInJvbGVzIjpbInJlYWRlciIsIndyaXRlciJdLCJyZXNvdXJjZXMiOlsiYWNjb3VudDokVVNFUl9JRCQ6ZjkyN2JiNzQtOTBmYy00NWFkLTk2ZmItYzcwNGY4NDMxZjdmIl19LHsiaWQiOiJtZXRhYXBpLXJwYy1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOndzOnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyJhY2NvdW50OiRVU0VSX0lEJDpmOTI3YmI3NC05MGZjLTQ1YWQtOTZmYi1jNzA0Zjg0MzFmN2YiXX0seyJpZCI6Im1ldGFhcGktcmVhbC10aW1lLXN0cmVhbWluZy1hcGkiLCJtZXRob2RzIjpbIm1ldGFhcGktYXBpOndzOnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyJhY2NvdW50OiRVU0VSX0lEJDpmOTI3YmI3NC05MGZjLTQ1YWQtOTZmYi1jNzA0Zjg0MzFmN2YiXX0seyJpZCI6Im1ldGFzdGF0cy1hcGkiLCJtZXRob2RzIjpbIm1ldGFzdGF0cy1hcGk6cmVzdDpwdWJsaWM6KjoqIl0sInJvbGVzIjpbInJlYWRlciJdLCJyZXNvdXJjZXMiOlsiYWNjb3VudDokVVNFUl9JRCQ6ZjkyN2JiNzQtOTBmYy00NWFkLTk2ZmItYzcwNGY4NDMxZjdmIl19LHsiaWQiOiJyaXNrLW1hbmFnZW1lbnQtYXBpIiwibWV0aG9kcyI6WyJyaXNrLW1hbmFnZW1lbnQtYXBpOnJlc3Q6cHVibGljOio6KiJdLCJyb2xlcyI6WyJyZWFkZXIiXSwicmVzb3VyY2VzIjpbImFjY291bnQ6JFVTRVJfSUQkOmY5MjdiYjc0LTkwZmMtNDVhZC05NmZiLWM3MDRmODQzMWY3ZiJdfSx7ImlkIjoiY29weWZhY3RvcnktYXBpIiwibWV0aG9kcyI6WyJjb3B5ZmFjdG9yeS1hcGk6cmVzdDpwdWJsaWM6KjoqIl0sInJvbGVzIjpbInJlYWRlciIsIndyaXRlciJdLCJyZXNvdXJjZXMiOlsiKjokVVNFUl9JRCQ6KiJdfSx7ImlkIjoibXQtbWFuYWdlci1hcGkiLCJtZXRob2RzIjpbIm10LW1hbmFnZXItYXBpOnJlc3Q6ZGVhbGluZzoqOioiLCJtdC1tYW5hZ2VyLWFwaTpyZXN0OnB1YmxpYzoqOioiXSwicm9sZXMiOlsicmVhZGVyIiwid3JpdGVyIl0sInJlc291cmNlcyI6WyIqOiRVU0VSX0lEJDoqIl19XSwidG9rZW5JZCI6IjIwMjEwMjEzIiwiaW1wZXJzb25hdGVkIjpmYWxzZSwicmVhbFVzZXJJZCI6IjI4ZDk3NGEwMjNjMTc4NjMwYmNjMGQ1NGY1MjkyYzVjIiwiaWF0IjoxNzUxMDYyMzg1fQ.fotTqN-0FIDYlBzeh-rgDfaiDcS7qzQ72DGs23j27sxXi9ijhfqVZ_f8ImgJVfi18psIrBmNK1F9iPkuixqrRla0fb3yFTybVC2jCiE1d87_zMBpMuRxTV9DcJbGQ3P3rJzeiAC2wRGRNzrOd_PARE4H7436WLZz4_n-MBQgA0z_VeZSDn38VzcUsxw3OvL8TGomXTbo1Q0auMbbjqTd_a9ywjbPcf7lg9MH24trnWtem8LgAJoR96Fp9fVK_KzcuJKmoNWDlt6dCd9QSJG2LeAa9UnhBPukQ4Ti9my61RMsNFAdS9R9YAQMc9YMyN9esdhQ8_FNnfy_vzxYpSMV0y3R6AadXjQGByp6BX7jfUdZp8Xdjp6K-YTxKRsiZ5GH5faV2ma5CI_gxxwX5nWk_9OBo6Np2CEs2X05b6FkMJ3oL3-sRLUjBN8RGHoHiEdY29_vAYuuwWwN5stJSwHteNtlpcWP1vxwdw2ob5vfldtSJIgcYwK3T9unQQm5_acgJ9bt6F0gaty4bxcCw-y7-UVlUQhTj73EDffhL-HkiuV65I5v_iuV4nCPSOlgDvEM_yeA9F-jLwvf39qUBhmcB6ZCl2ipk5tluyinFEMUtOqoc35Pxc207qN8ES0Sj6nwWF3mpXm2A8O5r0jLqdoiduQgFa_Azq9xXnPPU5Djvxs"
 MT5_ACCOUNT_ID = "f927bb74-90fc-45ad-96fb-c704f8431f7f"
 
 # Debug: Check if MetaAPI credentials are loaded
@@ -261,40 +261,80 @@ metaapi_instance = None
 mt5_account = None
 
 async def initialize_metaapi():
-    """Initialize MetaApi connection for real trading"""
+    """Initialize MetaApi connection for real trading - NEW ROBUST APPROACH"""
     global metaapi_instance, mt5_account
     
-    if not METAAPI_AVAILABLE or not METAAPI_TOKEN or not MT5_ACCOUNT_ID:
-        print("MetaApi not configured - using simulation mode")
+    if not METAAPI_AVAILABLE:
+        print("❌ MetaAPI SDK not available")
+        return False
+    
+    if not METAAPI_TOKEN or len(METAAPI_TOKEN) < 50:
+        print("❌ Invalid MetaAPI token")
+        return False
+        
+    if not MT5_ACCOUNT_ID or len(MT5_ACCOUNT_ID) != 36:
+        print("❌ Invalid MT5 Account ID format")
         return False
     
     try:
-        # Initialize MetaApi
+        print(f"🔄 Initializing MetaAPI with token: {METAAPI_TOKEN[:20]}...")
+        print(f"🔄 Connecting to account: {MT5_ACCOUNT_ID}")
+        
+        # Initialize MetaApi instance
         metaapi_instance = MetaApi(METAAPI_TOKEN)
+        print("✅ MetaAPI instance created")
         
-        # Get account
-        mt5_account = await metaapi_instance.metatrader_account_api.get_account(MT5_ACCOUNT_ID)
+        # Get account with timeout
+        print(f"🔄 Fetching account {MT5_ACCOUNT_ID}...")
+        mt5_account = await asyncio.wait_for(
+            metaapi_instance.metatrader_account_api.get_account(MT5_ACCOUNT_ID),
+            timeout=30
+        )
+        print(f"✅ Account retrieved: {mt5_account.name}")
+        print(f"📊 Account state: {mt5_account.state}")
+        print(f"📊 Account type: {mt5_account.type}")
         
-        # Deploy account if not deployed
+        # Check if account needs deployment
         if mt5_account.state != 'DEPLOYED':
-            print(f"Deploying account {MT5_ACCOUNT_ID}...")
+            print(f"🔄 Account not deployed. Current state: {mt5_account.state}")
+            print(f"🔄 Deploying account {MT5_ACCOUNT_ID}...")
             await mt5_account.deploy()
+            print("⏳ Waiting for deployment...")
+            await asyncio.wait_for(mt5_account.wait_deployed(), timeout=60)
+            print("✅ Account deployed successfully")
+        else:
+            print("✅ Account already deployed")
         
-        # Wait for deployment
-        await mt5_account.wait_deployed()
-        
-        # Connect to account
+        # Get RPC connection
+        print("🔄 Getting RPC connection...")
         connection = mt5_account.get_rpc_connection()
-        await connection.connect()
         
-        # Wait for connection
-        await connection.wait_synchronized()
+        # Connect with timeout
+        print("🔄 Connecting to MetaTrader...")
+        await asyncio.wait_for(connection.connect(), timeout=30)
+        print("✅ Connected to MetaTrader")
         
-        print(f"✅ MetaApi connected to account {MT5_ACCOUNT_ID}")
+        # Wait for synchronization
+        print("🔄 Waiting for synchronization...")
+        await asyncio.wait_for(connection.wait_synchronized(), timeout=60)
+        print("✅ Synchronized with MetaTrader")
+        
+        # Test connection with account info
+        print("🔄 Testing connection...")
+        account_info = await connection.get_account_information()
+        print(f"✅ Account info retrieved: {account_info.get('name', 'Unknown')}")
+        print(f"📊 Balance: {account_info.get('balance', 'Unknown')}")
+        print(f"📊 Currency: {account_info.get('currency', 'Unknown')}")
+        
+        print(f"🎉 METAAPI FULLY CONNECTED TO ACCOUNT {MT5_ACCOUNT_ID}")
         return True
         
+    except asyncio.TimeoutError as e:
+        print(f"❌ MetaAPI timeout: {str(e)}")
+        return False
     except Exception as e:
-        print(f"❌ MetaApi initialization failed: {str(e)}")
+        print(f"❌ MetaAPI error: {str(e)}")
+        print(f"❌ Error type: {type(e).__name__}")
         return False
 
 # Initialize simulation fallback
@@ -737,32 +777,34 @@ Stop Loss: {levels['sl']}"""
                     'sl_hit': False
                 }
                 
-                # Place real MetaAPI trade if configured
-                if METAAPI_AVAILABLE and METAAPI_TOKEN and MT5_ACCOUNT_ID:
-                    # Initialize MetaAPI connection if not already done
-                    if mt5_account is None:
-                        metaapi_success = await initialize_metaapi()
-                        if not metaapi_success:
-                            print(f"❌ MetaAPI initialization failed - trade not placed for {pair}")
-                    
-                    # Place real trade via MetaAPI
-                    if mt5_account is not None:
-                        mt5_order_id = await place_metaapi_trade(
-                            pair=pair,
-                            entry_price=levels['entry_raw'],
-                            tp3_price=levels['tp3_raw'],
-                            sl_price=levels['sl_raw'],
-                            entry_type=entry_type
-                        )
-                        if mt5_order_id:
-                            signal_data['mt5_order_id'] = mt5_order_id
-                            print(f"✅ REAL MetaAPI trade placed for {pair}: Order #{mt5_order_id}")
-                        else:
-                            print(f"❌ MetaAPI trade failed for {pair}")
+                # FORCE MetaAPI REAL TRADING - NEW APPROACH
+                print("\n" + "="*60)
+                print(f"ATTEMPTING REAL TRADE EXECUTION FOR {pair.upper()}")
+                print("="*60)
+                
+                # Force fresh MetaAPI initialization every time
+                print("🔄 Force initializing MetaAPI for this trade...")
+                metaapi_success = await initialize_metaapi()
+                
+                if metaapi_success and mt5_account is not None:
+                    print("✅ MetaAPI connected - placing REAL trade")
+                    mt5_order_id = await place_metaapi_trade(
+                        pair=pair,
+                        entry_price=levels['entry_raw'],
+                        tp3_price=levels['tp3_raw'],
+                        sl_price=levels['sl_raw'],
+                        entry_type=entry_type
+                    )
+                    if mt5_order_id:
+                        signal_data['mt5_order_id'] = mt5_order_id
+                        print(f"🎉 REAL TRADE EXECUTED: {pair} Order #{mt5_order_id}")
                     else:
-                        print(f"❌ MetaAPI not connected - trade not placed for {pair}")
+                        print(f"❌ Trade execution failed for {pair}")
                 else:
-                    print(f"⚠️ MetaAPI not configured - add METAAPI_TOKEN and MT5_ACCOUNT_ID")
+                    print(f"❌ MetaAPI connection failed - no real trade placed")
+                    print("📊 Sending signal only")
+                
+                print("="*60)
                 
                 # Store in active signals for monitoring
                 active_signals[primary_message.id] = signal_data
