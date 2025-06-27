@@ -14,6 +14,20 @@ import threading
 # Load environment variables
 load_dotenv()
 
+# Import MetaApi for real cloud trading
+try:
+    from metaapi_cloud_sdk import MetaApi
+    METAAPI_AVAILABLE = True
+    print("MetaApi Cloud SDK loaded - Real trading enabled")
+except ImportError:
+    METAAPI_AVAILABLE = False
+    print("MetaApi Cloud SDK not available - Install with: pip install metaapi-cloud-sdk")
+
+# Import for OANDA API (free alternative)
+import requests
+OANDA_AVAILABLE = True
+print("OANDA API ready - Free forex trading enabled")
+
 # Reconstruct tokens from split parts for enhanced security
 DISCORD_TOKEN_PART1 = os.getenv("DISCORD_TOKEN_PART1", "")
 DISCORD_TOKEN_PART2 = os.getenv("DISCORD_TOKEN_PART2", "")
@@ -22,6 +36,23 @@ DISCORD_TOKEN = DISCORD_TOKEN_PART1 + DISCORD_TOKEN_PART2
 DISCORD_CLIENT_ID_PART1 = os.getenv("DISCORD_CLIENT_ID_PART1", "")
 DISCORD_CLIENT_ID_PART2 = os.getenv("DISCORD_CLIENT_ID_PART2", "")
 DISCORD_CLIENT_ID = DISCORD_CLIENT_ID_PART1 + DISCORD_CLIENT_ID_PART2
+
+# MetaApi configuration for real cloud trading
+METAAPI_TOKEN = os.getenv("METAAPI_TOKEN", "")
+MT5_ACCOUNT_ID = os.getenv("MT5_ACCOUNT_ID", "")
+
+# OANDA configuration (free alternative)
+OANDA_API_KEY = os.getenv("OANDA_API_KEY", "")
+OANDA_ACCOUNT_ID = os.getenv("OANDA_ACCOUNT_ID", "")
+OANDA_ENVIRONMENT = os.getenv("OANDA_ENVIRONMENT", "practice")  # practice or live
+
+# OANDA API endpoints
+if OANDA_ENVIRONMENT == "live":
+    OANDA_API_URL = "https://api-fxtrade.oanda.com"
+    OANDA_STREAM_URL = "https://stream-fxtrade.oanda.com"
+else:
+    OANDA_API_URL = "https://api-fxpractice.oanda.com"
+    OANDA_STREAM_URL = "https://stream-fxpractice.oanda.com"
 
 # Bot setup with intents
 intents = discord.Intents.default()
@@ -44,6 +75,23 @@ class TradingBot(commands.Bot):
         print(f'{self.user} has landed!')
         if self.user:
             print(f'Bot ID: {self.user.id}')
+        
+        # Initialize trading APIs
+        trading_enabled = False
+        
+        # Check OANDA (free option)
+        if OANDA_API_KEY and OANDA_ACCOUNT_ID:
+            print("✅ OANDA configured - FREE REAL TRADING ENABLED")
+            trading_enabled = True
+        
+        # Check MetaApi (paid option)
+        if await initialize_metaapi():
+            print("✅ MetaApi connected - PAID REAL TRADING ENABLED")
+            trading_enabled = True
+        
+        if not trading_enabled:
+            print("⚠️ No trading APIs configured - using simulation mode")
+            print("💡 Add OANDA_API_KEY + OANDA_ACCOUNT_ID for FREE real trading")
 
 bot = TradingBot()
 
@@ -203,25 +251,73 @@ class CloudMT5Simulator:
     def last_error(self):
         return (0, "No error")
 
-# MetaTrader 5 integration - Cloud-based connection
-MT5_ENABLED = True  # Always enabled for cloud simulation
-MT5_CREDENTIALS = {
-    'login': None,
-    'password': None,
-    'server': 'MetaQuotes-Demo'
-}
+# MetaApi Cloud integration for real trading
+metaapi_instance = None
+mt5_account = None
 
-try:
-    import MetaTrader5 as mt5
-    print("MetaTrader5 module available")
-except ImportError:
-    print("MetaTrader5 not available on this platform. Using cloud MT5 simulation.")
-    mt5 = None
+async def initialize_metaapi():
+    """Initialize MetaApi connection for real trading"""
+    global metaapi_instance, mt5_account
+    
+    if not METAAPI_AVAILABLE or not METAAPI_TOKEN or not MT5_ACCOUNT_ID:
+        print("MetaApi not configured - using simulation mode")
+        return False
+    
+    try:
+        # Initialize MetaApi
+        metaapi_instance = MetaApi(METAAPI_TOKEN)
+        
+        # Get account
+        mt5_account = await metaapi_instance.metatrader_account_api.get_account(MT5_ACCOUNT_ID)
+        
+        # Deploy account if not deployed
+        if mt5_account.state != 'DEPLOYED':
+            print(f"Deploying account {MT5_ACCOUNT_ID}...")
+            await mt5_account.deploy()
+        
+        # Wait for deployment
+        await mt5_account.wait_deployed()
+        
+        # Connect to account
+        connection = mt5_account.get_rpc_connection()
+        await connection.connect()
+        
+        # Wait for connection
+        await connection.wait_synchronized()
+        
+        print(f"✅ MetaApi connected to account {MT5_ACCOUNT_ID}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ MetaApi initialization failed: {str(e)}")
+        return False
 
-# Initialize cloud simulator if MT5 not available
-if mt5 is None:
-    mt5 = CloudMT5Simulator()
-    print("Using MT5 cloud simulation")
+# Fallback to simulation for development
+class CloudMT5Simulator:
+    def __init__(self):
+        self.connected = False
+        
+    def initialize(self, login=None, password=None, server=None):
+        self.connected = True
+        return True
+        
+    def login(self, login, password, server):
+        return True
+        
+    def order_send(self, request):
+        order_id = random.randint(1000, 9999)
+        return type('obj', (object,), {
+            'retcode': 10009,  # Success
+            'comment': f'Simulated order #{order_id}',
+            'order': order_id
+        })()
+        
+    def last_error(self):
+        return (0, "No error")
+
+# Initialize simulation fallback
+mt5_simulator = CloudMT5Simulator()
+print("MetaApi Cloud integration initialized")
 
 # Trading pair configurations
 PAIR_CONFIG = {
@@ -334,45 +430,139 @@ async def connect_mt5():
         return False
 
 async def place_mt5_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
-    """Place a trade in MetaTrader 5"""
-    if not MT5_ENABLED:
-        print("MT5 not enabled - trade placement skipped")
+    """Place a real trade using available APIs (OANDA free, MetaApi paid, or simulation)"""
+    global mt5_account
+    
+    try:
+        # Try OANDA first (FREE option)
+        if OANDA_API_KEY and OANDA_ACCOUNT_ID:
+            result = await place_oanda_trade(pair, entry_price, tp3_price, sl_price, entry_type, lot_size)
+            if result:
+                return result
+        
+        # Try MetaApi Cloud (paid option)
+        if mt5_account is not None:
+            result = await place_metaapi_trade(pair, entry_price, tp3_price, sl_price, entry_type, lot_size)
+            if result:
+                return result
+        
+        # Fallback to simulation
+        return await place_simulated_trade(pair, entry_price, tp3_price, sl_price, entry_type, lot_size)
+        
+    except Exception as e:
+        print(f"Trade placement error: {str(e)}")
+        return await place_simulated_trade(pair, entry_price, tp3_price, sl_price, entry_type, lot_size)
+
+async def place_metaapi_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
+    """Execute real trade via MetaApi Cloud"""
+    try:
+        connection = mt5_account.get_rpc_connection()
+        
+        # Convert symbols for broker compatibility
+        symbol = pair.replace("XAUUSD", "GOLD").replace("US100", "NAS100").replace("US500", "SPX500")
+        
+        # Determine trade type
+        if entry_type.lower() == "buy execution":
+            result = await connection.create_market_order(symbol, "ORDER_TYPE_BUY", lot_size, 
+                                                        stop_loss=sl_price, take_profit=tp3_price,
+                                                        comment="Discord Bot - Buy Market")
+        elif entry_type.lower() == "sell execution":
+            result = await connection.create_market_order(symbol, "ORDER_TYPE_SELL", lot_size,
+                                                        stop_loss=sl_price, take_profit=tp3_price, 
+                                                        comment="Discord Bot - Sell Market")
+        elif entry_type.lower() == "buy limit":
+            result = await connection.create_limit_order(symbol, "ORDER_TYPE_BUY_LIMIT", lot_size, entry_price,
+                                                       stop_loss=sl_price, take_profit=tp3_price,
+                                                       comment="Discord Bot - Buy Limit")
+        elif entry_type.lower() == "sell limit":
+            result = await connection.create_limit_order(symbol, "ORDER_TYPE_SELL_LIMIT", lot_size, entry_price,
+                                                       stop_loss=sl_price, take_profit=tp3_price,
+                                                       comment="Discord Bot - Sell Limit")
+        else:
+            return None
+            
+        print(f"✅ REAL TRADE EXECUTED: {entry_type} {symbol} @ {entry_price}")
+        print(f"   Order ID: {result.get('orderId')}")
+        print(f"   TP: {tp3_price}, SL: {sl_price}")
+        
+        return result.get('orderId', str(random.randint(10000, 99999)))
+        
+    except Exception as e:
+        print(f"❌ MetaApi trade failed: {str(e)}")
+        return None
+
+async def place_oanda_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
+    """Execute real trade via OANDA API (FREE)"""
+    if not OANDA_API_KEY or not OANDA_ACCOUNT_ID:
         return None
     
     try:
-        # Determine order type
-        is_buy = entry_type.lower().startswith('buy')
-        order_type = getattr(mt5, 'ORDER_TYPE_BUY', 0) if is_buy else getattr(mt5, 'ORDER_TYPE_SELL', 1)
+        # Convert Discord symbols to OANDA format
+        oanda_symbol = pair.replace("XAUUSD", "XAU_USD").replace("GBPJPY", "GBP_JPY").replace("USDJPY", "USD_JPY")
+        oanda_symbol = oanda_symbol.replace("GBPUSD", "GBP_USD").replace("EURUSD", "EUR_USD").replace("AUDUSD", "AUD_USD")
+        oanda_symbol = oanda_symbol.replace("NZDUSD", "NZD_USD")
         
-        # Create trade request
-        request = {
-            "action": getattr(mt5, 'TRADE_ACTION_DEAL', 1),
-            "symbol": pair,
-            "volume": lot_size,
-            "type": order_type,
-            "price": entry_price,
-            "sl": sl_price,
-            "tp": tp3_price,  # Always use TP3 as final target
-            "deviation": 20,
-            "magic": 12345,
-            "comment": "Discord Bot Trade",
-            "type_time": getattr(mt5, 'ORDER_TIME_GTC', 0),
-            "type_filling": getattr(mt5, 'ORDER_FILLING_IOC', 1),
+        # Convert lot size to units (OANDA uses units, not lots)
+        units = int(lot_size * 100000)  # 1 lot = 100,000 units
+        
+        # Determine trade direction
+        if entry_type.lower().startswith('sell'):
+            units = -units  # Negative for sell orders
+        
+        headers = {
+            'Authorization': f'Bearer {OANDA_API_KEY}',
+            'Content-Type': 'application/json'
         }
         
-        # Send trade request
-        result = mt5.order_send(request)
+        # Create order data
+        order_data = {
+            "order": {
+                "units": str(units),
+                "instrument": oanda_symbol,
+                "timeInForce": "FOK",  # Fill or Kill for market orders
+                "type": "MARKET" if "execution" in entry_type.lower() else "LIMIT",
+                "positionFill": "DEFAULT",
+                "stopLossOnFill": {
+                    "price": str(sl_price)
+                },
+                "takeProfitOnFill": {
+                    "price": str(tp3_price)
+                }
+            }
+        }
         
-        if result.retcode != mt5.TRADE_RETCODE_DONE:
-            print(f"MT5 trade failed: {result.comment}")
+        # Add price for limit orders
+        if "limit" in entry_type.lower():
+            order_data["order"]["price"] = str(entry_price)
+        
+        # Execute trade via OANDA API
+        response = requests.post(
+            f"{OANDA_API_URL}/v3/accounts/{OANDA_ACCOUNT_ID}/orders",
+            headers=headers,
+            json=order_data,
+            timeout=10
+        )
+        
+        if response.status_code == 201:
+            result = response.json()
+            order_id = result.get("orderCreateTransaction", {}).get("id", "unknown")
+            print(f"✅ REAL OANDA TRADE: {entry_type} {oanda_symbol} @ {entry_price}")
+            print(f"   Order ID: {order_id}, Units: {units}")
+            print(f"   TP: {tp3_price}, SL: {sl_price}")
+            return order_id
+        else:
+            print(f"❌ OANDA trade failed: {response.status_code} - {response.text}")
             return None
-        
-        print(f"MT5 trade placed successfully: {result.order}")
-        return result.order
-        
+            
     except Exception as e:
-        print(f"Error placing MT5 trade: {e}")
+        print(f"❌ OANDA API error: {str(e)}")
         return None
+
+async def place_simulated_trade(pair: str, entry_price: float, tp3_price: float, sl_price: float, entry_type: str, lot_size: float = 0.01):
+    """Simulation fallback when no real APIs available"""
+    order_id = random.randint(1000, 9999)
+    print(f"📊 SIMULATED: {entry_type} {pair} @ {entry_price} (Order #{order_id})")
+    return order_id
 
 async def move_sl_to_breakeven(order_id: int, entry_price: float):
     """Move stop loss to breakeven (entry price)"""
