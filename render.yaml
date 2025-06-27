@@ -2,8 +2,10 @@ services:
   - type: web
     name: discord-trading-bot
     env: python
-    buildCommand: pip install discord.py python-dotenv aiohttp
+    runtime: python-3.11.0
+    buildCommand: pip install discord.py python-dotenv aiohttp metaapi-cloud-sdk requests
     startCommand: python main.py
+    healthCheckPath: /health
     envVars:
       - key: DISCORD_TOKEN_PART1
         sync: false
@@ -12,4 +14,8 @@ services:
       - key: DISCORD_CLIENT_ID_PART1
         sync: false
       - key: DISCORD_CLIENT_ID_PART2
+        sync: false
+      - key: METAAPI_TOKEN
+        sync: false
+      - key: MT5_ACCOUNT_ID
         sync: false
