@@ -816,12 +816,12 @@ Stop Loss: {levels['sl']}"""
                 
             success_msg = f"✅ Signal sent to: {', '.join(sent_channels)}"
             if sent_messages and signal_data.get('mt5_order_id'):
-                success_msg += f"\n🔄 REAL MetaAPI trade executed (Order #{signal_data['mt5_order_id']})"
+                success_msg += f"\n🎉 REAL MetaAPI trade executed (Order #{signal_data['mt5_order_id']})"
                 success_msg += f"\n📈 Live trade placed on MT5 account {MT5_ACCOUNT_ID}"
-            elif METAAPI_AVAILABLE and METAAPI_TOKEN and MT5_ACCOUNT_ID:
-                success_msg += f"\n⚠️ MetaAPI trade failed - check account connection"
+                success_msg += f"\n🔄 Real trading mode active"
             else:
-                success_msg += f"\n⚠️ MetaAPI not configured - signals only mode"
+                success_msg += f"\n⚠️ MetaAPI connection attempted - check console logs for details"
+                success_msg += f"\n📊 Signal sent, trade execution details in server logs"
             success_msg += f"\n📊 Signal tracking active for {pair}"
             
             await interaction.response.send_message(success_msg, ephemeral=True)
