@@ -293,7 +293,7 @@ async def stats_command(
 • TP3 Hits: **{tp3_hits}**
 
 **:octagonal_sign: STOP LOSS**
-• SL Hits: **{sl_hits}** ({sl_percent})
+• SL Hits: **{sl_hits}**
 
 **:bar_chart: PERFORMANCE SUMMARY**
 • **Win Rate:** {tp1_percent}
