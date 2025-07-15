@@ -90,12 +90,12 @@ PAIR_CONFIG = {
     'GBPJPY': {'decimals': 3, 'pip_value': 0.01},
     'GBPUSD': {'decimals': 4, 'pip_value': 0.0001},
     'EURUSD': {'decimals': 4, 'pip_value': 0.0001},
-    'AUDUSD': {'decimals': 5, 'pip_value': 0.00001},
-    'NZDUSD': {'decimals': 5, 'pip_value': 0.00001},
+    'AUDUSD': {'decimals': 5, 'pip_value': 0.0001},
+    'NZDUSD': {'decimals': 5, 'pip_value': 0.0001},
     'US100': {'decimals': 1, 'pip_value': 1.0},
     'US500': {'decimals': 2, 'pip_value': 0.1},
     'GER40': {'decimals': 1, 'pip_value': 1.0},  # Same as US100
-    'BTCUSD': {'decimals': 1, 'pip_value': 1.0},  # Same as US100 and GER40
+    'BTCUSD': {'decimals': 1, 'pip_value': 0.1},  # Same as US100 and GER40
     'GBPCHF': {'decimals': 4, 'pip_value': 0.0001},  # Same as GBPUSD
     'USDCHF': {'decimals': 4, 'pip_value': 0.0001},  # Same as GBPUSD
     'CADCHF': {'decimals': 4, 'pip_value': 0.0001},  # Same as GBPUSD
