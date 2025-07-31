@@ -6,8 +6,7 @@ from dotenv import load_dotenv
 import asyncio
 from aiohttp import web
 import json
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime, timedelta, timezone
 
 # Telegram integration
 try:
@@ -48,8 +47,8 @@ AUTO_ROLE_CONFIG = {
     "weekend_pending": {}  # member_id: {"join_time": datetime, "guild_id": guild_id} for weekend joiners
 }
 
-# Amsterdam timezone
-AMSTERDAM_TZ = pytz.timezone('Europe/Amsterdam')
+# Amsterdam timezone (UTC+1, UTC+2 during DST)
+AMSTERDAM_TZ = timezone(timedelta(hours=1))  # CET (Central European Time)
 
 class TradingBot(commands.Bot):
     def __init__(self):
@@ -100,7 +99,7 @@ class TradingBot(commands.Bot):
             return False
 
     def get_next_monday_activation_time(self):
-        """Get the next Monday 00:01 Amsterdam time"""
+        """Get the next Monday 00:01 Amsterdam time (when 24h countdown starts)"""
         now = datetime.now(AMSTERDAM_TZ)
         
         # Find next Monday
@@ -126,26 +125,23 @@ class TradingBot(commands.Bot):
             
             join_time = datetime.now(AMSTERDAM_TZ)
             
-            # Check if it's weekend time
+            # Add the role immediately for all members
+            await member.add_roles(role, reason="Auto-role for new member")
+            
+            # Check if it's weekend time to determine countdown behavior
             if self.is_weekend_time(join_time):
-                # Weekend join - delay activation until Monday
-                AUTO_ROLE_CONFIG["weekend_pending"][str(member.id)] = {
-                    "join_time": join_time.isoformat(),
-                    "guild_id": member.guild.id
-                }
-                
-                # Add the role immediately but mark as weekend delayed
-                await member.add_roles(role, reason="Auto-role for new member (weekend delayed)")
+                # Weekend join - 24-hour countdown starts Monday 00:01, ends Tuesday 00:01
+                next_monday = self.get_next_monday_activation_time()
                 
                 AUTO_ROLE_CONFIG["active_members"][str(member.id)] = {
                     "role_added_time": join_time.isoformat(),
                     "role_id": AUTO_ROLE_CONFIG["role_id"],
                     "guild_id": member.guild.id,
                     "weekend_delayed": True,
-                    "activation_time": self.get_next_monday_activation_time().isoformat()
+                    "activation_time": next_monday.isoformat()
                 }
                 
-                # Send weekend notification DM
+                # Send weekend notification DM  
                 try:
                     weekend_message = ("Hey! We're in the weekend right now, which means the trading markets are closed. "
                                      "We contacted you earlier to let you know about the 24-hour Premium Channel welcome gift, "
@@ -159,12 +155,10 @@ class TradingBot(commands.Bot):
                 except Exception as e:
                     print(f"❌ Error sending weekend notification DM to {member.display_name}: {str(e)}")
                 
-                print(f"✅ Auto-role '{role.name}' added to {member.display_name} (weekend delayed activation)")
+                print(f"✅ Auto-role '{role.name}' added to {member.display_name} (24h countdown starts Monday, ends Tuesday)")
                 
             else:
-                # Normal join - immediate activation
-                await member.add_roles(role, reason="Auto-role for new member")
-                
+                # Normal join - immediate 24-hour countdown
                 AUTO_ROLE_CONFIG["active_members"][str(member.id)] = {
                     "role_added_time": join_time.isoformat(),
                     "role_id": AUTO_ROLE_CONFIG["role_id"],
@@ -172,7 +166,7 @@ class TradingBot(commands.Bot):
                     "weekend_delayed": False
                 }
                 
-                print(f"✅ Auto-role '{role.name}' added to {member.display_name} (immediate activation)")
+                print(f"✅ Auto-role '{role.name}' added to {member.display_name} (24h countdown starts now)")
             
             # Save the updated config
             await self.save_auto_role_config()
@@ -217,7 +211,7 @@ class TradingBot(commands.Bot):
                     # Check if activation time has been reached
                     activation_time = datetime.fromisoformat(data.get("activation_time"))
                     if activation_time.tzinfo is None:
-                        activation_time = AMSTERDAM_TZ.localize(activation_time)
+                        activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
                     else:
                         activation_time = activation_time.astimezone(AMSTERDAM_TZ)
                     
@@ -230,7 +224,7 @@ class TradingBot(commands.Bot):
                     # Normal members - calculate from role_added_time
                     role_added_time = datetime.fromisoformat(data["role_added_time"])
                     if role_added_time.tzinfo is None:
-                        role_added_time = AMSTERDAM_TZ.localize(role_added_time)
+                        role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
                     else:
                         role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
                     
@@ -267,7 +261,7 @@ class TradingBot(commands.Bot):
                 
                 activation_time = datetime.fromisoformat(data.get("activation_time"))
                 if activation_time.tzinfo is None:
-                    activation_time = AMSTERDAM_TZ.localize(activation_time)
+                    activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
                 else:
                     activation_time = activation_time.astimezone(AMSTERDAM_TZ)
                 
@@ -442,7 +436,7 @@ def get_remaining_time_display(member_id: str) -> str:
             # For weekend delayed members, show time until activation or time since activation
             activation_time = datetime.fromisoformat(data.get("activation_time"))
             if activation_time.tzinfo is None:
-                activation_time = AMSTERDAM_TZ.localize(activation_time)
+                activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
                 activation_time = activation_time.astimezone(AMSTERDAM_TZ)
             
@@ -461,7 +455,7 @@ def get_remaining_time_display(member_id: str) -> str:
             # Normal member - calculate from role_added_time
             role_added_time = datetime.fromisoformat(data["role_added_time"])
             if role_added_time.tzinfo is None:
-                role_added_time = AMSTERDAM_TZ.localize(role_added_time)
+                role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
                 role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
             
@@ -521,7 +515,7 @@ async def timed_auto_role_command(
                 f"✅ **Auto-role system enabled!**\n"
                 f"• **Role:** {role.mention}\n"
                 f"• **Duration:** 24 hours (fixed)\n"
-                f"• **Weekend handling:** Enabled (roles for weekend joiners activate on Monday)\n\n"
+                f"• **Weekend handling:** Enabled (24h countdown starts Monday, ends Tuesday)\n\n"
                 f"New members will automatically receive this role for 24 hours.",
                 ephemeral=True
             )
@@ -838,40 +832,112 @@ async def stats_command(
 
 # Web server for health checks
 async def web_server():
-    """Simple web server for health checks"""
+    """Simple web server for health checks and keeping the service alive"""
     async def health_check(request):
-        return web.Response(text="Bot is running!", status=200)
+        bot_status = "Connected" if bot.is_ready() else "Connecting"
+        guild_count = len(bot.guilds) if bot.is_ready() else 0
+        
+        response_data = {
+            "status": "running",
+            "bot_status": bot_status,
+            "guild_count": guild_count,
+            "uptime": str(datetime.now()),
+            "version": "2.0"
+        }
+        
+        return web.json_response(response_data, status=200)
+    
+    async def root_handler(request):
+        return web.Response(text="Discord Trading Bot is running!", status=200)
     
     app = web.Application()
-    app.router.add_get('/', health_check)
+    app.router.add_get('/', root_handler)
     app.router.add_get('/health', health_check)
+    app.router.add_get('/status', health_check)
     
     try:
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', 5000)
         await site.start()
-        print("Web server started on port 5000")
+        print("✅ Web server started successfully on port 5000")
+        print("Health check available at: http://0.0.0.0:5000/health")
+        
+        # Keep the server running
+        while True:
+            await asyncio.sleep(3600)  # Sleep for 1 hour, then continue
+            
     except Exception as e:
-        print(f"Failed to start web server: {e}")
+        print(f"❌ Failed to start web server: {e}")
+        raise
 
 async def main():
-    """Main async function to run both the web server and Discord bot"""
+    """Main async function to run both web server and Discord bot concurrently"""
     # Check if Discord token is available
     if not DISCORD_TOKEN:
         print("Error: DISCORD_TOKEN not found in environment variables")
+        print("Please set DISCORD_TOKEN_PART1 and DISCORD_TOKEN_PART2 environment variables")
         return
     
-    # Start web server
-    print("Starting web server...")
-    await web_server()
+    print(f"Bot token length: {len(DISCORD_TOKEN)} characters")
+    print("Starting Discord Trading Bot...")
     
-    # Start Discord bot
-    print("Starting Discord bot...")
+    # Create tasks for concurrent execution
+    tasks = []
+    
+    # Web server task
+    print("Starting web server...")
+    web_task = asyncio.create_task(web_server())
+    tasks.append(web_task)
+    
+    # Discord bot task with proper error handling
+    async def start_bot_with_retry():
+        max_retries = 3
+        retry_delay = 30  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Starting Discord bot (attempt {attempt + 1}/{max_retries})...")
+                await bot.start(DISCORD_TOKEN)
+                break  # If successful, break out of retry loop
+            except discord.LoginFailure as e:
+                print(f"Discord login failed: {e}")
+                print("Please check your Discord bot token")
+                break  # Don't retry on login failures
+            except discord.HTTPException as e:
+                if e.status == 429:  # Rate limited
+                    print(f"Rate limited by Discord. Waiting {retry_delay} seconds before retry...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"Discord HTTP error: {e}")
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        print("Max retries reached. Bot failed to start.")
+            except Exception as e:
+                print(f"Unexpected error starting Discord bot: {e}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                else:
+                    print("Max retries reached. Bot failed to start.")
+    
+    bot_task = asyncio.create_task(start_bot_with_retry())
+    tasks.append(bot_task)
+    
+    # Wait for all tasks
     try:
-        await bot.start(DISCORD_TOKEN)
-    except Exception as e:
-        print(f"Error starting Discord bot: {e}")
+        await asyncio.gather(*tasks, return_exceptions=True)
+    except KeyboardInterrupt:
+        print("Shutting down...")
+        await bot.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot shutdown complete.")
+    except Exception as e:
+        print(f"Fatal error: {e}")
