@@ -6,8 +6,7 @@ from dotenv import load_dotenv
 import asyncio
 from aiohttp import web
 import json
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime, timedelta, timezone
 
 # Telegram integration
 try:
@@ -48,8 +47,8 @@ AUTO_ROLE_CONFIG = {
     "weekend_pending": {}  # member_id: {"join_time": datetime, "guild_id": guild_id} for weekend joiners
 }
 
-# Amsterdam timezone
-AMSTERDAM_TZ = pytz.timezone('Europe/Amsterdam')
+# Amsterdam timezone (UTC+1, UTC+2 during DST)
+AMSTERDAM_TZ = timezone(timedelta(hours=1))  # CET (Central European Time)
 
 class TradingBot(commands.Bot):
     def __init__(self):
@@ -217,7 +216,7 @@ class TradingBot(commands.Bot):
                     # Check if activation time has been reached
                     activation_time = datetime.fromisoformat(data.get("activation_time"))
                     if activation_time.tzinfo is None:
-                        activation_time = AMSTERDAM_TZ.localize(activation_time)
+                        activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
                     else:
                         activation_time = activation_time.astimezone(AMSTERDAM_TZ)
                     
@@ -230,7 +229,7 @@ class TradingBot(commands.Bot):
                     # Normal members - calculate from role_added_time
                     role_added_time = datetime.fromisoformat(data["role_added_time"])
                     if role_added_time.tzinfo is None:
-                        role_added_time = AMSTERDAM_TZ.localize(role_added_time)
+                        role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
                     else:
                         role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
                     
@@ -267,7 +266,7 @@ class TradingBot(commands.Bot):
                 
                 activation_time = datetime.fromisoformat(data.get("activation_time"))
                 if activation_time.tzinfo is None:
-                    activation_time = AMSTERDAM_TZ.localize(activation_time)
+                    activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
                 else:
                     activation_time = activation_time.astimezone(AMSTERDAM_TZ)
                 
@@ -442,7 +441,7 @@ def get_remaining_time_display(member_id: str) -> str:
             # For weekend delayed members, show time until activation or time since activation
             activation_time = datetime.fromisoformat(data.get("activation_time"))
             if activation_time.tzinfo is None:
-                activation_time = AMSTERDAM_TZ.localize(activation_time)
+                activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
                 activation_time = activation_time.astimezone(AMSTERDAM_TZ)
             
@@ -461,7 +460,7 @@ def get_remaining_time_display(member_id: str) -> str:
             # Normal member - calculate from role_added_time
             role_added_time = datetime.fromisoformat(data["role_added_time"])
             if role_added_time.tzinfo is None:
-                role_added_time = AMSTERDAM_TZ.localize(role_added_time)
+                role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
                 role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
             

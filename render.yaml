@@ -2,7 +2,7 @@ services:
   - type: web
     name: discord-trading-bot
     env: python
-    buildCommand: "pip install --upgrade pip && pip install discord.py==2.5.2 python-dotenv==1.1.0 aiohttp==3.12.13 requests pyrogram==2.0.106 tgcrypto==1.2.5 pytz==2024.1"
+    buildCommand: "pip install --upgrade pip && pip install discord.py==2.5.2 python-dotenv==1.1.0 aiohttp==3.12.13 requests pyrogram==2.0.106 tgcrypto==1.2.5"
     startCommand: "python main.py"
     plan: free
     region: oregon

@@ -6,4 +6,3 @@ pip install aiohttp==3.12.13
 pip install requests
 pip install pyrogram==2.0.106
 pip install tgcrypto==1.2.5
-pip install pytz==2024.1
