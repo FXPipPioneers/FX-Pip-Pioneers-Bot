@@ -837,40 +837,112 @@ async def stats_command(
 
 # Web server for health checks
 async def web_server():
-    """Simple web server for health checks"""
+    """Simple web server for health checks and keeping the service alive"""
     async def health_check(request):
-        return web.Response(text="Bot is running!", status=200)
+        bot_status = "Connected" if bot.is_ready() else "Connecting"
+        guild_count = len(bot.guilds) if bot.is_ready() else 0
+        
+        response_data = {
+            "status": "running",
+            "bot_status": bot_status,
+            "guild_count": guild_count,
+            "uptime": str(datetime.now()),
+            "version": "2.0"
+        }
+        
+        return web.json_response(response_data, status=200)
+    
+    async def root_handler(request):
+        return web.Response(text="Discord Trading Bot is running!", status=200)
     
     app = web.Application()
-    app.router.add_get('/', health_check)
+    app.router.add_get('/', root_handler)
     app.router.add_get('/health', health_check)
+    app.router.add_get('/status', health_check)
     
     try:
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, '0.0.0.0', 5000)
         await site.start()
-        print("Web server started on port 5000")
+        print("✅ Web server started successfully on port 5000")
+        print("Health check available at: http://0.0.0.0:5000/health")
+        
+        # Keep the server running
+        while True:
+            await asyncio.sleep(3600)  # Sleep for 1 hour, then continue
+            
     except Exception as e:
-        print(f"Failed to start web server: {e}")
+        print(f"❌ Failed to start web server: {e}")
+        raise
 
 async def main():
-    """Main async function to run both the web server and Discord bot"""
+    """Main async function to run both web server and Discord bot concurrently"""
     # Check if Discord token is available
     if not DISCORD_TOKEN:
         print("Error: DISCORD_TOKEN not found in environment variables")
+        print("Please set DISCORD_TOKEN_PART1 and DISCORD_TOKEN_PART2 environment variables")
         return
     
-    # Start web server
-    print("Starting web server...")
-    await web_server()
+    print(f"Bot token length: {len(DISCORD_TOKEN)} characters")
+    print("Starting Discord Trading Bot...")
     
-    # Start Discord bot
-    print("Starting Discord bot...")
+    # Create tasks for concurrent execution
+    tasks = []
+    
+    # Web server task
+    print("Starting web server...")
+    web_task = asyncio.create_task(web_server())
+    tasks.append(web_task)
+    
+    # Discord bot task with proper error handling
+    async def start_bot_with_retry():
+        max_retries = 3
+        retry_delay = 30  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                print(f"Starting Discord bot (attempt {attempt + 1}/{max_retries})...")
+                await bot.start(DISCORD_TOKEN)
+                break  # If successful, break out of retry loop
+            except discord.LoginFailure as e:
+                print(f"Discord login failed: {e}")
+                print("Please check your Discord bot token")
+                break  # Don't retry on login failures
+            except discord.HTTPException as e:
+                if e.status == 429:  # Rate limited
+                    print(f"Rate limited by Discord. Waiting {retry_delay} seconds before retry...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"Discord HTTP error: {e}")
+                    if attempt < max_retries - 1:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        print("Max retries reached. Bot failed to start.")
+            except Exception as e:
+                print(f"Unexpected error starting Discord bot: {e}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    await asyncio.sleep(retry_delay)
+                else:
+                    print("Max retries reached. Bot failed to start.")
+    
+    bot_task = asyncio.create_task(start_bot_with_retry())
+    tasks.append(bot_task)
+    
+    # Wait for all tasks
     try:
-        await bot.start(DISCORD_TOKEN)
-    except Exception as e:
-        print(f"Error starting Discord bot: {e}")
+        await asyncio.gather(*tasks, return_exceptions=True)
+    except KeyboardInterrupt:
+        print("Shutting down...")
+        await bot.close()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot shutdown complete.")
+    except Exception as e:
+        print(f"Fatal error: {e}")

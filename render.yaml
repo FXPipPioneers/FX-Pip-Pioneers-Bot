@@ -2,12 +2,13 @@ services:
   - type: web
     name: discord-trading-bot
     env: python
-    buildCommand: "pip install --upgrade pip && pip install discord.py==2.5.2 python-dotenv==1.1.0 aiohttp==3.12.13 requests pyrogram==2.0.106 tgcrypto==1.2.5"
+    buildCommand: "pip install --upgrade pip && pip install --no-cache-dir discord.py==2.5.2 python-dotenv==1.1.0 aiohttp==3.12.13 requests pyrogram==2.0.106 tgcrypto==1.2.5"
     startCommand: "python main.py"
     plan: free
     region: oregon
     runtime: python-3.11.0
     healthCheckPath: /health
+    autoDeploy: false
     envVars:
       - key: DISCORD_TOKEN_PART1
         sync: false
