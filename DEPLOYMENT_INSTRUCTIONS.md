@@ -1,51 +1,59 @@
-# Discord Trading Bot - Deployment Instructions
+# Discord Trading Bot Deployment Instructions
 
-## For Render.com Deployment
+## Updated Deployment for Render.com (with Telegram Integration)
 
-### Service Type: Web Service (FREE)
-**Good news:** You can use the FREE Web Service option!
+### Build Configuration
+- **Build Command**: `pip install --upgrade pip && pip install discord.py==2.5.2 python-dotenv==1.1.0 aiohttp==3.12.13 requests pyrogram==2.0.106 tgcrypto==1.2.5`
+- **Start Command**: `python main.py`
+- **Runtime**: `python-3.11.0`
 
-### Build Command:
+### Alternative Build Commands (if primary fails)
+1. With no-cache: `pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir discord.py python-dotenv aiohttp requests pyrogram tgcrypto`
+2. Force reinstall: `pip install --upgrade pip --force-reinstall && pip install --force-reinstall pyrogram==2.0.106 tgcrypto==1.2.5 discord.py==2.5.2 python-dotenv==1.1.0 aiohttp==3.12.13 requests`
+
+### Required Environment Variables
+
+#### Discord Configuration
+- `DISCORD_TOKEN_PART1` - First half of Discord bot token
+- `DISCORD_TOKEN_PART2` - Second half of Discord bot token  
+- `DISCORD_CLIENT_ID_PART1` - First half of Discord client ID
+- `DISCORD_CLIENT_ID_PART2` - Second half of Discord client ID
+
+#### Telegram Configuration (for signal forwarding)
+- `TELEGRAM_API_ID` - Telegram API ID from my.telegram.org
+- `TELEGRAM_API_HASH` - Telegram API hash from my.telegram.org
+- `TELEGRAM_PHONE_NUMBER` - Phone number associated with Telegram account
+- `TELEGRAM_SOURCE_CHAT_ID` - Chat ID of the source trading group
+- `TELEGRAM_DEFAULT_CHANNELS` - Default Discord channels for forwarding (comma-separated)
+- `TELEGRAM_DEFAULT_ROLES` - Default roles to mention (comma-separated)
+
+### Deployment Files
+- `render.yaml` - Main Render configuration
+- `install_deps.sh` - Custom dependency installation script
+- `dependencies.txt` - Fallback dependency list
+- `pyproject.toml` - Python project configuration
+
+### Troubleshooting
+
+If you get "Telegram integration not installed" error on Render:
+1. Check that the build command ran successfully in deployment logs
+2. Verify all packages were installed: `pyrogram==2.0.106` and `tgcrypto==1.2.5`
+3. Redeploy with the updated `install_deps.sh` script
+
+### Manual Installation (if needed)
+If automatic deployment fails, you can manually install dependencies:
+```bash
+pip install --upgrade pip
+pip install discord.py==2.5.2
+pip install python-dotenv==1.1.0  
+pip install aiohttp==3.12.13
+pip install pyrogram==2.0.106
+pip install tgcrypto==1.2.5
 ```
-pip install discord.py python-dotenv aiohttp
-```
 
-### Start Command:
-```
-python main.py
-```
+### Health Check
+The bot provides health check endpoints at:
+- `/` - Basic status
+- `/health` - Health check endpoint
 
-### Required Environment Variables:
-Set these in your Render.com dashboard:
-
-1. `DISCORD_TOKEN_PART1` = (first half of your Discord bot token)
-2. `DISCORD_TOKEN_PART2` = (second half of your Discord bot token)
-3. `DISCORD_CLIENT_ID_PART1` = (first half of your Discord app client ID)
-4. `DISCORD_CLIENT_ID_PART2` = (second half of your Discord app client ID)
-
-### How to Split Your Token:
-If your Discord bot token is: `MTIzNDU2Nzg5MDEyMzQ1Njc4.ABCDEF.xyz123abc456def789`
-
-Split it roughly in half:
-- DISCORD_TOKEN_PART1: `MTIzNDU2Nzg5MDEyMzQ1Njc4.ABC`
-- DISCORD_TOKEN_PART2: `DEF.xyz123abc456def789`
-
-### How to Split Your Client ID:
-If your Discord client ID is: `1234567890123456789`
-
-Split it roughly in half:
-- DISCORD_CLIENT_ID_PART1: `123456789`
-- DISCORD_CLIENT_ID_PART2: `0123456789`
-
-### Deployment Steps:
-1. Upload all files to your GitHub repository
-2. Connect GitHub to Render.com
-3. **Create a new "Web Service"** (FREE tier available)
-4. Set the build and start commands above
-5. Add the environment variables
-6. Deploy
-
-Your bot will run 24/7 once deployed successfully!
-
-### How it works:
-The bot now includes a simple web server that responds to health checks, allowing it to use Render's free Web Service tier instead of the paid Background Worker.
+Both endpoints return "Discord Trading Bot is running!" when the service is active.

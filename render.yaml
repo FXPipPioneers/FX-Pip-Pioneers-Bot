@@ -2,8 +2,10 @@ services:
   - type: web
     name: discord-trading-bot
     env: python
-    buildCommand: pip install discord.py python-dotenv aiohttp
+    runtime: python-3.11.0
+    buildCommand: pip install --upgrade pip && pip install -r dependencies.txt
     startCommand: python main.py
+    healthCheckPath: /health
     envVars:
       - key: DISCORD_TOKEN_PART1
         sync: false
@@ -12,4 +14,16 @@ services:
       - key: DISCORD_CLIENT_ID_PART1
         sync: false
       - key: DISCORD_CLIENT_ID_PART2
+        sync: false
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_PHONE_NUMBER
+        sync: false
+      - key: TELEGRAM_SOURCE_CHAT_ID
+        sync: false
+      - key: TELEGRAM_DEFAULT_CHANNELS
+        sync: false
+      - key: TELEGRAM_DEFAULT_ROLES
         sync: false

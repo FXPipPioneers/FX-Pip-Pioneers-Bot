@@ -28,6 +28,14 @@ A professional Discord bot for sending trading signals with automatic TP/SL calc
 - **Secure Deployment**: Environment-based configuration
 - **Error Handling**: Comprehensive error management
 
+### 📱 Telegram Integration
+- **Automatic Signal Forwarding**: Monitors Telegram groups for trading signals
+- **Intelligent Signal Parsing**: Recognizes trading pairs, entry types, and prices
+- **Instant Relay**: Forwards signals to Discord without delays
+- **Broker Warnings**: Adds specific warnings for volatile pairs
+- **Configurable Monitoring**: Monitor specific chat IDs or all accessible chats
+- **Status Checking**: `/telegram` command to check integration status
+
 ## Setup Instructions
 
 ### 1. Discord Bot Setup
@@ -75,7 +83,7 @@ python main.py
 
 **Build Command:**
 ```
-pip install discord.py python-dotenv aiohttp
+pip install discord.py python-dotenv aiohttp pyrogram tgcrypto
 ```
 
 **Start Command:**
@@ -85,10 +93,20 @@ python main.py
 
 ### 3. Environment Variables on Render
 Set these environment variables in your Render dashboard:
+
+**Discord Configuration (Required):**
 - `DISCORD_TOKEN_PART1` = (first half of your Discord bot token)
 - `DISCORD_TOKEN_PART2` = (second half of your Discord bot token)  
 - `DISCORD_CLIENT_ID_PART1` = (first half of your Discord app client ID)
 - `DISCORD_CLIENT_ID_PART2` = (second half of your Discord app client ID)
+
+**Telegram Integration (Optional):**
+- `TELEGRAM_API_ID` = Your Telegram API ID from my.telegram.org
+- `TELEGRAM_API_HASH` = Your Telegram API Hash from my.telegram.org
+- `TELEGRAM_PHONE_NUMBER` = Your phone number for Telegram
+- `TELEGRAM_SOURCE_CHAT_ID` = Chat ID to monitor (optional, monitors all if not set)
+- `TELEGRAM_DEFAULT_CHANNELS` = Default Discord channels (comma-separated)
+- `TELEGRAM_DEFAULT_ROLES` = Default roles to mention (comma-separated)
 
 **Example Token Split:**
 If your token is: `MTIzNDU2Nzg5MDEyMzQ1Njc4.ABCDEF.xyz123abc456def789`
