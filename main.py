@@ -8,6 +8,15 @@ from aiohttp import web
 import json
 from datetime import datetime, timedelta, timezone
 
+# Try to import pytz for proper timezone handling, fallback to basic timezone if not available
+try:
+    import pytz
+    PYTZ_AVAILABLE = True
+    print("✅ Pytz loaded - Full timezone support enabled")
+except ImportError:
+    PYTZ_AVAILABLE = False
+    print("⚠️ Pytz not available - Using basic timezone handling")
+
 # Telegram integration
 try:
     from pyrogram.client import Client
@@ -47,9 +56,12 @@ AUTO_ROLE_CONFIG = {
     "weekend_pending": {}  # member_id: {"join_time": datetime, "guild_id": guild_id} for weekend joiners
 }
 
-# Amsterdam timezone with proper DST support
-import pytz
-AMSTERDAM_TZ = pytz.timezone('Europe/Amsterdam')  # Proper Amsterdam timezone with DST support
+# Amsterdam timezone handling with fallback
+if PYTZ_AVAILABLE:
+    AMSTERDAM_TZ = pytz.timezone('Europe/Amsterdam')  # Proper Amsterdam timezone with DST support
+else:
+    # Fallback: Use UTC+1 (CET) as approximation
+    AMSTERDAM_TZ = timezone(timedelta(hours=1))  # Basic Amsterdam timezone without DST
 
 class TradingBot(commands.Bot):
     def __init__(self):
@@ -128,19 +140,30 @@ class TradingBot(commands.Bot):
             days_ahead += 7
         
         next_monday = now + timedelta(days=days_ahead)
-        activation_time = AMSTERDAM_TZ.localize(
-            next_monday.replace(hour=0, minute=1, second=0, microsecond=0, tzinfo=None)
-        )
+        
+        if PYTZ_AVAILABLE:
+            activation_time = AMSTERDAM_TZ.localize(
+                next_monday.replace(hour=0, minute=1, second=0, microsecond=0, tzinfo=None)
+            )
+        else:
+            activation_time = next_monday.replace(hour=0, minute=1, second=0, microsecond=0, tzinfo=AMSTERDAM_TZ)
         
         return activation_time
     
     def get_monday_expiry_time(self, join_time):
         """Get the Monday 23:59 Amsterdam time (when weekend joiners' role expires)"""
         now = join_time if join_time else datetime.now(AMSTERDAM_TZ)
-        if now.tzinfo is None:
-            now = AMSTERDAM_TZ.localize(now)
+        
+        if PYTZ_AVAILABLE:
+            if now.tzinfo is None:
+                now = AMSTERDAM_TZ.localize(now)
+            else:
+                now = now.astimezone(AMSTERDAM_TZ)
         else:
-            now = now.astimezone(AMSTERDAM_TZ)
+            if now.tzinfo is None:
+                now = now.replace(tzinfo=AMSTERDAM_TZ)
+            else:
+                now = now.astimezone(AMSTERDAM_TZ)
         
         # Find next Monday
         days_ahead = 0 - now.weekday()  # Monday is 0
@@ -148,9 +171,13 @@ class TradingBot(commands.Bot):
             days_ahead += 7
         
         next_monday = now + timedelta(days=days_ahead)
-        expiry_time = AMSTERDAM_TZ.localize(
-            next_monday.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=None)
-        )
+        
+        if PYTZ_AVAILABLE:
+            expiry_time = AMSTERDAM_TZ.localize(
+                next_monday.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=None)
+            )
+        else:
+            expiry_time = next_monday.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=AMSTERDAM_TZ)
         
         return expiry_time
 
@@ -253,14 +280,20 @@ class TradingBot(commands.Bot):
                     # Weekend joiners have specific expiry time (Monday 23:59)
                     expiry_time = datetime.fromisoformat(data["expiry_time"])
                     if expiry_time.tzinfo is None:
-                        expiry_time = AMSTERDAM_TZ.localize(expiry_time)
+                        if PYTZ_AVAILABLE:
+                            expiry_time = AMSTERDAM_TZ.localize(expiry_time)
+                        else:
+                            expiry_time = expiry_time.replace(tzinfo=AMSTERDAM_TZ)
                     else:
                         expiry_time = expiry_time.astimezone(AMSTERDAM_TZ)
                 else:
                     # Normal members - 24 hours from role_added_time
                     role_added_time = datetime.fromisoformat(data["role_added_time"])
                     if role_added_time.tzinfo is None:
-                        role_added_time = AMSTERDAM_TZ.localize(role_added_time)
+                        if PYTZ_AVAILABLE:
+                            role_added_time = AMSTERDAM_TZ.localize(role_added_time)
+                        else:
+                            role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
                     else:
                         role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
                     
