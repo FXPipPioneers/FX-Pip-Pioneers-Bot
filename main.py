@@ -213,7 +213,7 @@ class TradingBot(commands.Bot):
                 # Send weekend notification DM  
                 try:
                     weekend_message = ("**Welcome to FX Pip Pioneers!** As a welcome gift, we usually give our new members "
-                                     "***access to the Premium Signals channel for 24 hours.** However, the trading markets are closed "
+                                     "**access to the Premium Signals channel for 24 hours.** However, the trading markets are closed "
                                      "right now because it's the weekend. We're writing to let you know that your 24 hours will start "
                                      "counting down from the moment the markets open again on Monday. This way, your welcome gift won't "
                                      "be wasted on the weekend and you'll actually be able to make use of it.")
