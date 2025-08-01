@@ -47,31 +47,51 @@ AUTO_ROLE_CONFIG = {
     "weekend_pending": {}  # member_id: {"join_time": datetime, "guild_id": guild_id} for weekend joiners
 }
 
-# Amsterdam timezone (UTC+1, UTC+2 during DST)
-AMSTERDAM_TZ = timezone(timedelta(hours=1))  # CET (Central European Time)
+# Amsterdam timezone with proper DST support
+import pytz
+AMSTERDAM_TZ = pytz.timezone('Europe/Amsterdam')  # Proper Amsterdam timezone with DST support
 
 class TradingBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix='!', intents=intents)
 
     async def setup_hook(self):
-        # Sync slash commands
-        try:
-            synced = await self.tree.sync()
-            print(f"Synced {len(synced)} command(s)")
-        except Exception as e:
-            print(f"Failed to sync commands: {e}")
+        # Sync slash commands with retry mechanism for better reliability
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                synced = await self.tree.sync()
+                print(f"✅ Successfully synced {len(synced)} command(s) on attempt {attempt + 1}")
+                break
+            except Exception as e:
+                print(f"❌ Failed to sync commands on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(5)  # Wait 5 seconds before retry
+                else:
+                    print("⚠️ All sync attempts failed. Commands may not be available.")
+                    
+        # Force sync after bot is ready for better reliability
+        self.first_sync_done = False
 
     async def on_ready(self):
         print(f'{self.user} has landed!')
         if self.user:
             print(f'Bot ID: {self.user.id}')
         
+        # Force command sync on ready for better reliability
+        if not getattr(self, 'first_sync_done', False):
+            try:
+                synced = await self.tree.sync()
+                print(f"🔄 Force synced {len(synced)} command(s) on ready")
+                self.first_sync_done = True
+            except Exception as e:
+                print(f"⚠️ Force sync on ready failed: {e}")
+        
         # Start the role removal task
         if not self.role_removal_task.is_running():
             self.role_removal_task.start()
         
-        # Start the weekend activation task
+        # Start the Monday activation notification task
         if not self.weekend_activation_task.is_running():
             self.weekend_activation_task.start()
         
@@ -108,9 +128,31 @@ class TradingBot(commands.Bot):
             days_ahead += 7
         
         next_monday = now + timedelta(days=days_ahead)
-        activation_time = next_monday.replace(hour=0, minute=1, second=0, microsecond=0)
+        activation_time = AMSTERDAM_TZ.localize(
+            next_monday.replace(hour=0, minute=1, second=0, microsecond=0, tzinfo=None)
+        )
         
         return activation_time
+    
+    def get_monday_expiry_time(self, join_time):
+        """Get the Monday 23:59 Amsterdam time (when weekend joiners' role expires)"""
+        now = join_time if join_time else datetime.now(AMSTERDAM_TZ)
+        if now.tzinfo is None:
+            now = AMSTERDAM_TZ.localize(now)
+        else:
+            now = now.astimezone(AMSTERDAM_TZ)
+        
+        # Find next Monday
+        days_ahead = 0 - now.weekday()  # Monday is 0
+        if days_ahead <= 0:  # Target day already happened this week
+            days_ahead += 7
+        
+        next_monday = now + timedelta(days=days_ahead)
+        expiry_time = AMSTERDAM_TZ.localize(
+            next_monday.replace(hour=23, minute=59, second=59, microsecond=0, tzinfo=None)
+        )
+        
+        return expiry_time
 
     async def on_member_join(self, member):
         """Handle new member joins and assign auto-role if enabled"""
@@ -130,24 +172,24 @@ class TradingBot(commands.Bot):
             
             # Check if it's weekend time to determine countdown behavior
             if self.is_weekend_time(join_time):
-                # Weekend join - 24-hour countdown starts Monday 00:01, ends Tuesday 00:01
-                next_monday = self.get_next_monday_activation_time()
+                # Weekend join - expires Monday 23:59 (not Tuesday 01:00)
+                monday_expiry = self.get_monday_expiry_time(join_time)
                 
                 AUTO_ROLE_CONFIG["active_members"][str(member.id)] = {
                     "role_added_time": join_time.isoformat(),
                     "role_id": AUTO_ROLE_CONFIG["role_id"],
                     "guild_id": member.guild.id,
                     "weekend_delayed": True,
-                    "activation_time": next_monday.isoformat()
+                    "expiry_time": monday_expiry.isoformat()
                 }
                 
                 # Send weekend notification DM  
                 try:
-                    weekend_message = ("Hey! We're in the weekend right now, which means the trading markets are closed. "
-                                     "We contacted you earlier to let you know about the 24-hour Premium Channel welcome gift, "
-                                     "and we're writing you again to let you know that your 24 hours will start counting from the "
-                                     "moment the markets open again on the upcoming Monday. This way, your welcome gift won't be "
-                                     "wasted on the weekend, and you'll actually be able to make use of it.")
+                    weekend_message = ("**Welcome to FX Pip Pioneers!** As a welcome gift, we usually give our new members "
+                                     "***access to the Premium Signals channel for 24 hours.** However, the trading markets are closed "
+                                     "right now because it's the weekend. We're writing to let you know that your 24 hours will start "
+                                     "counting down from the moment the markets open again on Monday. This way, your welcome gift won't "
+                                     "be wasted on the weekend and you'll actually be able to make use of it.")
                     await member.send(weekend_message)
                     print(f"✅ Sent weekend notification DM to {member.display_name}")
                 except discord.Forbidden:
@@ -155,7 +197,7 @@ class TradingBot(commands.Bot):
                 except Exception as e:
                     print(f"❌ Error sending weekend notification DM to {member.display_name}: {str(e)}")
                 
-                print(f"✅ Auto-role '{role.name}' added to {member.display_name} (24h countdown starts Monday, ends Tuesday)")
+                print(f"✅ Auto-role '{role.name}' added to {member.display_name} (expires Monday 23:59)")
                 
             else:
                 # Normal join - immediate 24-hour countdown
@@ -206,25 +248,19 @@ class TradingBot(commands.Bot):
         
         for member_id, data in AUTO_ROLE_CONFIG["active_members"].items():
             try:
-                # Skip weekend delayed members that haven't been activated yet
-                if data.get("weekend_delayed", False):
-                    # Check if activation time has been reached
-                    activation_time = datetime.fromisoformat(data.get("activation_time"))
-                    if activation_time.tzinfo is None:
-                        activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
+                # Handle weekend delayed members with custom expiry time
+                if data.get("weekend_delayed", False) and "expiry_time" in data:
+                    # Weekend joiners have specific expiry time (Monday 23:59)
+                    expiry_time = datetime.fromisoformat(data["expiry_time"])
+                    if expiry_time.tzinfo is None:
+                        expiry_time = AMSTERDAM_TZ.localize(expiry_time)
                     else:
-                        activation_time = activation_time.astimezone(AMSTERDAM_TZ)
-                    
-                    if current_time < activation_time:
-                        continue  # Not yet activated
-                    
-                    # Calculate expiry from activation time, not role_added_time
-                    expiry_time = activation_time + timedelta(hours=24)
+                        expiry_time = expiry_time.astimezone(AMSTERDAM_TZ)
                 else:
-                    # Normal members - calculate from role_added_time
+                    # Normal members - 24 hours from role_added_time
                     role_added_time = datetime.fromisoformat(data["role_added_time"])
                     if role_added_time.tzinfo is None:
-                        role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
+                        role_added_time = AMSTERDAM_TZ.localize(role_added_time)
                     else:
                         role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
                     
@@ -245,29 +281,26 @@ class TradingBot(commands.Bot):
         if expired_members:
             await self.save_auto_role_config()
 
-    @tasks.loop(minutes=5)  # Check every 5 minutes for weekend activations
+    @tasks.loop(minutes=5)  # Check every 5 minutes for Monday activation notifications
     async def weekend_activation_task(self):
-        """Background task to activate weekend delayed roles on Monday"""
+        """Background task to send Monday activation DMs for weekend joiners"""
         if not AUTO_ROLE_CONFIG["enabled"] or not AUTO_ROLE_CONFIG["active_members"]:
             return
         
         current_time = datetime.now(AMSTERDAM_TZ)
-        activated_members = []
+        weekday = current_time.weekday()  # Monday=0
+        hour = current_time.hour
         
+        # Only run on Monday between 00:00 and 01:00 to send activation messages
+        if weekday != 0 or hour > 1:
+            return
+            
         for member_id, data in AUTO_ROLE_CONFIG["active_members"].items():
             try:
-                if not data.get("weekend_delayed", False):
-                    continue
-                
-                activation_time = datetime.fromisoformat(data.get("activation_time"))
-                if activation_time.tzinfo is None:
-                    activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
-                else:
-                    activation_time = activation_time.astimezone(AMSTERDAM_TZ)
-                
-                # Check if it's time to activate (Monday 00:01 has passed)
-                if current_time >= activation_time and data.get("weekend_delayed"):
-                    # Send activation notification DM
+                # Only process weekend delayed members who haven't been notified yet
+                if (data.get("weekend_delayed", False) and 
+                    not data.get("monday_notification_sent", False)):
+                    
                     guild = self.get_guild(data["guild_id"])
                     if guild:
                         member = guild.get_member(int(member_id))
@@ -275,32 +308,22 @@ class TradingBot(commands.Bot):
                             try:
                                 activation_message = ("Hey! The weekend is over and the markets are now open. "
                                                     "That means your 24-hour welcome gift has officially started. "
-                                                    "You now have full access to the <#1384668129036075109> channel. "
+                                                    "You now have full access to the premium channel. "
                                                     "Let's make the most of it by securing some wins together!")
                                 await member.send(activation_message)
-                                print(f"✅ Sent activation notification DM to {member.display_name}")
+                                print(f"✅ Sent Monday activation DM to {member.display_name}")
+                                
+                                # Mark as notified to avoid duplicate messages
+                                AUTO_ROLE_CONFIG["active_members"][member_id]["monday_notification_sent"] = True
+                                await self.save_auto_role_config()
+                                
                             except discord.Forbidden:
-                                print(f"⚠️ Could not send activation notification DM to {member.display_name} (DMs disabled)")
+                                print(f"⚠️ Could not send Monday activation DM to {member.display_name} (DMs disabled)")
                             except Exception as e:
-                                print(f"❌ Error sending activation notification DM to {member.display_name}: {str(e)}")
-                    
-                    # Mark as activated (remove weekend_delayed flag)
-                    AUTO_ROLE_CONFIG["active_members"][member_id]["weekend_delayed"] = False
-                    AUTO_ROLE_CONFIG["active_members"][member_id]["role_added_time"] = activation_time.isoformat()
-                    activated_members.append(member_id)
+                                print(f"❌ Error sending Monday activation DM to {member.display_name}: {str(e)}")
                     
             except Exception as e:
-                print(f"❌ Error processing weekend activation for member {member_id}: {str(e)}")
-        
-        # Clean up weekend_pending entries for activated members
-        for member_id in activated_members:
-            if member_id in AUTO_ROLE_CONFIG["weekend_pending"]:
-                del AUTO_ROLE_CONFIG["weekend_pending"][member_id]
-        
-        # Save updated config if there were changes
-        if activated_members:
-            await self.save_auto_role_config()
-            print(f"✅ Activated {len(activated_members)} weekend delayed roles")
+                print(f"❌ Error processing Monday activation for member {member_id}: {str(e)}")
 
     async def remove_expired_role(self, member_id):
         """Remove expired role from member and send DM"""
