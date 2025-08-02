@@ -240,11 +240,11 @@ class TradingBot(commands.Bot):
                 # Send weekend notification DM
                 try:
                     weekend_message = (
-                        "**Welcome to FX Pip Pioneers!** As a welcome gift, we always give our new members "
-                        "**access to the Premium Signals channel for 24 hours.** However, the trading markets are currently closed, "
-                        "because it's the weekend, so we want to let you know that your 24 hours of free access will start "
-                        "counting down from the moment the markets open again on Monday. This way, your welcome gift won't "
-                        "be wasted on the weekend and you'll actually be able to make use of it."
+                        "**Welcome to FX Pip Pioneers!** As a welcome gift, we usually give our new members "
+                        "**access to the Premium Signals channel for 24 hours.** However, the trading markets are closed right now "
+                        "because it's the weekend. We're writing to let you know that your 24 hours will start counting down from "
+                        "the moment the markets open again on Monday. This way, your welcome gift won't be wasted on the weekend "
+                        "and you'll actually be able to make use of it."
                     )
                     await member.send(weekend_message)
                     print(
@@ -271,6 +271,27 @@ class TradingBot(commands.Bot):
                     "guild_id": member.guild.id,
                     "weekend_delayed": False
                 }
+
+                # Send weekday welcome DM
+                try:
+                    weekday_message = (
+                        "**:star2: Welcome to FX Pip Pioneers! :star2:**\n\n"
+                        ":white_check_mark: As a welcome gift, we've given you access to our **Premium Signals channel for 24 hours.** "
+                        "That means you can start profiting from the **8–10 trade signals** we send per day right now!\n\n"
+                        "***This is your shot at consistency, clarity, and growth in trading. Let's level up together!***"
+                    )
+                    await member.send(weekday_message)
+                    print(
+                        f"✅ Sent weekday welcome DM to {member.display_name}"
+                    )
+                except discord.Forbidden:
+                    print(
+                        f"⚠️ Could not send weekday welcome DM to {member.display_name} (DMs disabled)"
+                    )
+                except Exception as e:
+                    print(
+                        f"❌ Error sending weekday welcome DM to {member.display_name}: {str(e)}"
+                    )
 
                 print(
                     f"✅ Auto-role '{role.name}' added to {member.display_name} (24h countdown starts now)"
