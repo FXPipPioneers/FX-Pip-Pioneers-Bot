@@ -624,50 +624,54 @@ def get_remaining_time_display(member_id: str) -> str:
 
         current_time = datetime.now(AMSTERDAM_TZ)
 
-        if data.get("weekend_delayed", False):
-            # For weekend delayed members, show time until activation or time since activation
-            activation_time = datetime.fromisoformat(
-                data.get("activation_time"))
-            if activation_time.tzinfo is None:
-                activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
+        if data.get("weekend_delayed", False) and "expiry_time" in data:
+            # Weekend joiners have specific expiry time (Monday 23:59)
+            expiry_time = datetime.fromisoformat(data["expiry_time"])
+            if expiry_time.tzinfo is None:
+                if PYTZ_AVAILABLE:
+                    expiry_time = AMSTERDAM_TZ.localize(expiry_time)
+                else:
+                    expiry_time = expiry_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
-                activation_time = activation_time.astimezone(AMSTERDAM_TZ)
-
-            if current_time < activation_time:
-                # Not yet activated - show time until activation
-                time_until_activation = activation_time - current_time
-                hours = int(time_until_activation.total_seconds() // 3600)
-                minutes = int(
-                    (time_until_activation.total_seconds() % 3600) // 60)
-                seconds = int(time_until_activation.total_seconds() % 60)
-                return f"Activates in {hours}h {minutes}m {seconds}s"
-            else:
-                # Activated - show remaining time from activation
-                expiry_time = activation_time + timedelta(hours=24)
-                time_remaining = expiry_time - current_time
+                expiry_time = expiry_time.astimezone(AMSTERDAM_TZ)
+            
+            time_remaining = expiry_time - current_time
+            
+            if time_remaining.total_seconds() <= 0:
+                return "Expired"
+            
+            hours = int(time_remaining.total_seconds() // 3600)
+            minutes = int((time_remaining.total_seconds() % 3600) // 60)
+            seconds = int(time_remaining.total_seconds() % 60)
+            
+            return f"Weekend: {hours}h {minutes}m {seconds}s"
+            
         else:
-            # Normal member - calculate from role_added_time
+            # Normal member - 24 hours from role_added_time
             role_added_time = datetime.fromisoformat(data["role_added_time"])
             if role_added_time.tzinfo is None:
-                role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
+                if PYTZ_AVAILABLE:
+                    role_added_time = AMSTERDAM_TZ.localize(role_added_time)
+                else:
+                    role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
                 role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
 
             expiry_time = role_added_time + timedelta(hours=24)
             time_remaining = expiry_time - current_time
 
-        if time_remaining.total_seconds() <= 0:
-            return "Expired"
+            if time_remaining.total_seconds() <= 0:
+                return "Expired"
 
-        hours = int(time_remaining.total_seconds() // 3600)
-        minutes = int((time_remaining.total_seconds() % 3600) // 60)
-        seconds = int(time_remaining.total_seconds() % 60)
+            hours = int(time_remaining.total_seconds() // 3600)
+            minutes = int((time_remaining.total_seconds() % 3600) // 60)
+            seconds = int(time_remaining.total_seconds() % 60)
 
-        return f"{hours}h {minutes}m {seconds}s"
+            return f"{hours}h {minutes}m {seconds}s"
 
     except Exception as e:
         print(f"Error calculating time for member {member_id}: {str(e)}")
-        return "Error"
+        return "ERROR"
 
 
 @bot.tree.command(
@@ -675,11 +679,15 @@ def get_remaining_time_display(member_id: str) -> str:
     description="Configure timed auto-role for new members (24h fixed duration)"
 )
 @app_commands.describe(
-    action="Enable/disable, check status, or list active members",
-    role="Role to assign to new members (required when enabling)")
+    action="Enable/disable, check status, list active members, or add user manually",
+    role="Role to assign to new members (required when enabling)",
+    user="User to add manually (required for adduser action)",
+    timing="Timing type for manual add: 24hours or weekend (required for adduser action)")
 async def timed_auto_role_command(interaction: discord.Interaction,
                                   action: str,
-                                  role: discord.Role | None = None):
+                                  role: discord.Role | None = None,
+                                  user: discord.Member | None = None,
+                                  timing: str | None = None):
     """Configure the timed auto-role system with fixed 24-hour duration"""
 
     # Check permissions
@@ -813,9 +821,97 @@ async def timed_auto_role_command(interaction: discord.Interaction,
             await interaction.response.send_message(list_message,
                                                     ephemeral=True)
 
+        elif action.lower() == "adduser":
+            if not AUTO_ROLE_CONFIG["enabled"]:
+                await interaction.response.send_message(
+                    "❌ Auto-role system is disabled. Enable it first before adding users manually.",
+                    ephemeral=True)
+                return
+                
+            if not user:
+                await interaction.response.send_message(
+                    "❌ You must specify a user when using the adduser action.",
+                    ephemeral=True)
+                return
+                
+            if not timing or timing.lower() not in ["24hours", "weekend"]:
+                await interaction.response.send_message(
+                    "❌ You must specify timing: '24hours' or 'weekend'.",
+                    ephemeral=True)
+                return
+
+            # Get the configured role
+            target_role = interaction.guild.get_role(AUTO_ROLE_CONFIG["role_id"]) if interaction.guild else None
+            if not target_role:
+                await interaction.response.send_message(
+                    "❌ Auto-role is not properly configured. No valid role found.",
+                    ephemeral=True)
+                return
+
+            # Check if user already has the role or is already tracked
+            if str(user.id) in AUTO_ROLE_CONFIG["active_members"]:
+                await interaction.response.send_message(
+                    f"❌ {user.display_name} already has an active temporary role.",
+                    ephemeral=True)
+                return
+
+            if target_role in user.roles:
+                await interaction.response.send_message(
+                    f"❌ {user.display_name} already has the {target_role.name} role.",
+                    ephemeral=True)
+                return
+
+            try:
+                # Add the role to the user
+                await user.add_roles(target_role, reason="Manual addition via /timedautorole adduser")
+                
+                now = datetime.now(AMSTERDAM_TZ)
+                
+                if timing.lower() == "weekend":
+                    # Weekend timing - expires Monday 23:59
+                    expiry_time = bot.get_monday_expiry_time(now)
+                    
+                    AUTO_ROLE_CONFIG["active_members"][str(user.id)] = {
+                        "role_added_time": now.isoformat(),
+                        "role_id": target_role.id,
+                        "weekend_delayed": True,
+                        "expiry_time": expiry_time.isoformat()
+                    }
+                    
+                    timing_info = f"Weekend timing (expires Monday 23:59)"
+                    
+                else:
+                    # 24-hour timing
+                    AUTO_ROLE_CONFIG["active_members"][str(user.id)] = {
+                        "role_added_time": now.isoformat(),
+                        "role_id": target_role.id,
+                        "weekend_delayed": False
+                    }
+                    
+                    timing_info = f"24 hours (expires {(now + timedelta(hours=24)).strftime('%A %H:%M')})"
+
+                # Save configuration
+                await bot.save_auto_role_config()
+
+                await interaction.response.send_message(
+                    f"✅ **Successfully added {user.display_name} to temporary role**\n"
+                    f"• **Role:** {target_role.name}\n"
+                    f"• **Duration:** {timing_info}\n"
+                    f"• **Added by:** {interaction.user.display_name}",
+                    ephemeral=True)
+
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    f"❌ I don't have permission to add the {target_role.name} role to {user.display_name}.",
+                    ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(
+                    f"❌ Error adding role to {user.display_name}: {str(e)}",
+                    ephemeral=True)
+
         else:
             await interaction.response.send_message(
-                "❌ Invalid action. Use 'enable', 'disable', 'status', or 'list'.",
+                "❌ Invalid action. Use 'enable', 'disable', 'status', 'list', or 'adduser'.",
                 ephemeral=True)
 
     except Exception as e:
@@ -825,10 +921,18 @@ async def timed_auto_role_command(interaction: discord.Interaction,
 
 @timed_auto_role_command.autocomplete('action')
 async def action_autocomplete(interaction: discord.Interaction, current: str):
-    actions = ['enable', 'disable', 'status', 'list']
+    actions = ['enable', 'disable', 'status', 'list', 'adduser']
     return [
         app_commands.Choice(name=action, value=action) for action in actions
         if current.lower() in action.lower()
+    ]
+
+@timed_auto_role_command.autocomplete('timing')
+async def timing_autocomplete(interaction: discord.Interaction, current: str):
+    timings = ['24hours', 'weekend']
+    return [
+        app_commands.Choice(name=timing, value=timing) for timing in timings
+        if current.lower() in timing.lower()
     ]
 
 
