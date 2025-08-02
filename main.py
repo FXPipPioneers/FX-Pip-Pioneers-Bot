@@ -644,7 +644,11 @@ def get_remaining_time_display(member_id: str) -> str:
             minutes = int((time_remaining.total_seconds() % 3600) // 60)
             seconds = int(time_remaining.total_seconds() % 60)
             
-            return f"Weekend: {hours}h {minutes}m {seconds}s"
+            # Check if it's a custom duration
+            if data.get("custom_duration", False):
+                return f"Custom: {hours}h {minutes}m {seconds}s"
+            else:
+                return f"Weekend: {hours}h {minutes}m {seconds}s"
             
         else:
             # Normal member - 24 hours from role_added_time
@@ -679,15 +683,19 @@ def get_remaining_time_display(member_id: str) -> str:
     description="Configure timed auto-role for new members (24h fixed duration)"
 )
 @app_commands.describe(
-    action="Enable/disable, check status, list active members, or add user manually",
+    action="Enable/disable, check status, list active members, add user manually, or remove user",
     role="Role to assign to new members (required when enabling)",
-    user="User to add manually (required for adduser action)",
-    timing="Timing type for manual add: 24hours or weekend (required for adduser action)")
+    user="User to add/remove manually (required for adduser/removeuser actions)",
+    timing="Timing type for manual add: 24hours, weekend, or custom (required for adduser action)",
+    custom_hours="Custom hours for role duration (used with timing=custom)",
+    custom_minutes="Custom minutes for role duration (used with timing=custom)")
 async def timed_auto_role_command(interaction: discord.Interaction,
                                   action: str,
                                   role: discord.Role | None = None,
                                   user: discord.Member | None = None,
-                                  timing: str | None = None):
+                                  timing: str | None = None,
+                                  custom_hours: int | None = None,
+                                  custom_minutes: int | None = None):
     """Configure the timed auto-role system with fixed 24-hour duration"""
 
     # Check permissions
@@ -834,11 +842,28 @@ async def timed_auto_role_command(interaction: discord.Interaction,
                     ephemeral=True)
                 return
                 
-            if not timing or timing.lower() not in ["24hours", "weekend"]:
+            if not timing or timing.lower() not in ["24hours", "weekend", "custom"]:
                 await interaction.response.send_message(
-                    "❌ You must specify timing: '24hours' or 'weekend'.",
+                    "❌ You must specify timing: '24hours', 'weekend', or 'custom'.",
                     ephemeral=True)
                 return
+                
+            if timing.lower() == "custom":
+                if custom_hours is None and custom_minutes is None:
+                    await interaction.response.send_message(
+                        "❌ You must specify custom_hours and/or custom_minutes when using custom timing.",
+                        ephemeral=True)
+                    return
+                if custom_hours is not None and (custom_hours < 0 or custom_hours > 168):  # Max 1 week
+                    await interaction.response.send_message(
+                        "❌ Custom hours must be between 0 and 168 (1 week maximum).",
+                        ephemeral=True)
+                    return
+                if custom_minutes is not None and (custom_minutes < 0 or custom_minutes > 59):
+                    await interaction.response.send_message(
+                        "❌ Custom minutes must be between 0 and 59.",
+                        ephemeral=True)
+                    return
 
             # Get the configured role
             target_role = interaction.guild.get_role(AUTO_ROLE_CONFIG["role_id"]) if interaction.guild else None
@@ -880,6 +905,36 @@ async def timed_auto_role_command(interaction: discord.Interaction,
                     
                     timing_info = f"Weekend timing (expires Monday 23:59)"
                     
+                elif timing.lower() == "custom":
+                    # Custom timing
+                    hours = custom_hours or 0
+                    minutes = custom_minutes or 0
+                    total_minutes = (hours * 60) + minutes
+                    
+                    if total_minutes == 0:
+                        await interaction.response.send_message(
+                            "❌ Custom duration cannot be 0. Please specify at least 1 minute.",
+                            ephemeral=True)
+                        return
+                    
+                    expiry_time = now + timedelta(hours=hours, minutes=minutes)
+                    
+                    AUTO_ROLE_CONFIG["active_members"][str(user.id)] = {
+                        "role_added_time": now.isoformat(),
+                        "role_id": target_role.id,
+                        "weekend_delayed": True,  # Use weekend logic for custom timing
+                        "expiry_time": expiry_time.isoformat(),
+                        "custom_duration": True
+                    }
+                    
+                    duration_text = []
+                    if hours > 0:
+                        duration_text.append(f"{hours}h")
+                    if minutes > 0:
+                        duration_text.append(f"{minutes}m")
+                    
+                    timing_info = f"Custom: {' '.join(duration_text)} (expires {expiry_time.strftime('%A %H:%M')})"
+                    
                 else:
                     # 24-hour timing
                     AUTO_ROLE_CONFIG["active_members"][str(user.id)] = {
@@ -909,9 +964,62 @@ async def timed_auto_role_command(interaction: discord.Interaction,
                     f"❌ Error adding role to {user.display_name}: {str(e)}",
                     ephemeral=True)
 
+        elif action.lower() == "removeuser":
+            if not user:
+                await interaction.response.send_message(
+                    "❌ You must specify a user when using the removeuser action.",
+                    ephemeral=True)
+                return
+
+            # Check if user is tracked in the system
+            if str(user.id) not in AUTO_ROLE_CONFIG["active_members"]:
+                await interaction.response.send_message(
+                    f"❌ {user.display_name} is not currently tracked in the auto-role system.",
+                    ephemeral=True)
+                return
+
+            try:
+                # Get the role info before removing
+                user_data = AUTO_ROLE_CONFIG["active_members"][str(user.id)]
+                role_id = user_data.get("role_id")
+                target_role = interaction.guild.get_role(role_id) if interaction.guild and role_id else None
+                
+                # Remove from tracking
+                del AUTO_ROLE_CONFIG["active_members"][str(user.id)]
+                
+                # Remove the role if they still have it
+                if target_role and target_role in user.roles:
+                    await user.remove_roles(target_role, reason="Manual removal via /timedautorole removeuser")
+                    role_removed_msg = f"• **Role removed:** {target_role.name}"
+                else:
+                    role_removed_msg = "• **Role status:** Already removed or not found"
+
+                # Save configuration
+                await bot.save_auto_role_config()
+
+                await interaction.response.send_message(
+                    f"✅ **Successfully removed {user.display_name} from auto-role system**\n"
+                    f"{role_removed_msg}\n"
+                    f"• **Removed by:** {interaction.user.display_name}",
+                    ephemeral=True)
+
+            except discord.Forbidden:
+                # Still remove from tracking even if we can't remove the role
+                del AUTO_ROLE_CONFIG["active_members"][str(user.id)]
+                await bot.save_auto_role_config()
+                
+                await interaction.response.send_message(
+                    f"⚠️ **Removed {user.display_name} from tracking** but couldn't remove role due to permissions.\n"
+                    f"• **Removed by:** {interaction.user.display_name}",
+                    ephemeral=True)
+            except Exception as e:
+                await interaction.response.send_message(
+                    f"❌ Error removing {user.display_name}: {str(e)}",
+                    ephemeral=True)
+
         else:
             await interaction.response.send_message(
-                "❌ Invalid action. Use 'enable', 'disable', 'status', 'list', or 'adduser'.",
+                "❌ Invalid action. Use 'enable', 'disable', 'status', 'list', 'adduser', or 'removeuser'.",
                 ephemeral=True)
 
     except Exception as e:
@@ -921,7 +1029,7 @@ async def timed_auto_role_command(interaction: discord.Interaction,
 
 @timed_auto_role_command.autocomplete('action')
 async def action_autocomplete(interaction: discord.Interaction, current: str):
-    actions = ['enable', 'disable', 'status', 'list', 'adduser']
+    actions = ['enable', 'disable', 'status', 'list', 'adduser', 'removeuser']
     return [
         app_commands.Choice(name=action, value=action) for action in actions
         if current.lower() in action.lower()
@@ -929,7 +1037,7 @@ async def action_autocomplete(interaction: discord.Interaction, current: str):
 
 @timed_auto_role_command.autocomplete('timing')
 async def timing_autocomplete(interaction: discord.Interaction, current: str):
-    timings = ['24hours', 'weekend']
+    timings = ['24hours', 'weekend', 'custom']
     return [
         app_commands.Choice(name=timing, value=timing) for timing in timings
         if current.lower() in timing.lower()
