@@ -305,7 +305,7 @@ class TradingBot(commands.Bot):
         except Exception as e:
             print(f"❌ Error saving auto-role config: {str(e)}")
 
-    @tasks.loop(minutes=15)  # Check every 15 minutes for more precise timing
+    @tasks.loop(seconds=30)  # Check every 30 seconds for instant role removal
     async def role_removal_task(self):
         """Background task to remove expired roles and send DMs"""
         if not AUTO_ROLE_CONFIG["enabled"] or not AUTO_ROLE_CONFIG[
@@ -363,7 +363,7 @@ class TradingBot(commands.Bot):
             await self.save_auto_role_config()
 
     @tasks.loop(
-        minutes=5)  # Check every 5 minutes for Monday activation notifications
+        minutes=1)  # Check every minute for Monday activation notifications
     async def weekend_activation_task(self):
         """Background task to send Monday activation DMs for weekend joiners"""
         if not AUTO_ROLE_CONFIG["enabled"] or not AUTO_ROLE_CONFIG[
@@ -447,9 +447,10 @@ class TradingBot(commands.Bot):
                     f"✅ Removed expired role '{role.name}' from {member.display_name}"
                 )
 
-            # Send DM to the member
+            # Send DM to the member with the default message
             try:
-                await member.send(AUTO_ROLE_CONFIG["custom_message"])
+                default_message = "Hey! Your **24-hour free access** to the premium channel has unfortunately **ran out**. We truly hope you were able to benefit with us & we hope to see you back soon! For now, feel free to continue following our trade signals in the regular channels."
+                await member.send(default_message)
                 print(f"✅ Sent expiration DM to {member.display_name}")
             except discord.Forbidden:
                 print(
@@ -638,7 +639,7 @@ def get_remaining_time_display(member_id: str) -> str:
             time_remaining = expiry_time - current_time
             
             if time_remaining.total_seconds() <= 0:
-                return "Expired"
+                return None  # Return None for expired members to filter them out
             
             hours = int(time_remaining.total_seconds() // 3600)
             minutes = int((time_remaining.total_seconds() % 3600) // 60)
@@ -665,7 +666,7 @@ def get_remaining_time_display(member_id: str) -> str:
             time_remaining = expiry_time - current_time
 
             if time_remaining.total_seconds() <= 0:
-                return "Expired"
+                return None  # Return None for expired members to filter them out
 
             hours = int(time_remaining.total_seconds() // 3600)
             minutes = int((time_remaining.total_seconds() % 3600) // 60)
@@ -797,8 +798,10 @@ async def timed_auto_role_command(interaction: discord.Interaction,
 
                     # Get precise remaining time
                     time_display = get_remaining_time_display(member_id)
-                    member_list.append(
-                        f"• {member.display_name} - {time_display}")
+                    # Only add members who aren't expired (time_display will be None for expired)
+                    if time_display is not None:
+                        member_list.append(
+                            f"• {member.display_name} - {time_display}")
 
                 except Exception as e:
                     print(f"Error processing member {member_id}: {str(e)}")
@@ -899,6 +902,7 @@ async def timed_auto_role_command(interaction: discord.Interaction,
                     AUTO_ROLE_CONFIG["active_members"][str(user.id)] = {
                         "role_added_time": now.isoformat(),
                         "role_id": target_role.id,
+                        "guild_id": interaction.guild.id,
                         "weekend_delayed": True,
                         "expiry_time": expiry_time.isoformat()
                     }
@@ -922,6 +926,7 @@ async def timed_auto_role_command(interaction: discord.Interaction,
                     AUTO_ROLE_CONFIG["active_members"][str(user.id)] = {
                         "role_added_time": now.isoformat(),
                         "role_id": target_role.id,
+                        "guild_id": interaction.guild.id,
                         "weekend_delayed": True,  # Use weekend logic for custom timing
                         "expiry_time": expiry_time.isoformat(),
                         "custom_duration": True
@@ -940,6 +945,7 @@ async def timed_auto_role_command(interaction: discord.Interaction,
                     AUTO_ROLE_CONFIG["active_members"][str(user.id)] = {
                         "role_added_time": now.isoformat(),
                         "role_id": target_role.id,
+                        "guild_id": interaction.guild.id,
                         "weekend_delayed": False
                     }
                     
