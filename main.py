@@ -240,9 +240,9 @@ class TradingBot(commands.Bot):
                 # Send weekend notification DM
                 try:
                     weekend_message = (
-                        "**Welcome to FX Pip Pioneers!** As a welcome gift, we usually give our new members "
-                        "**access to the Premium Signals channel for 24 hours.** However, the trading markets are closed "
-                        "right now because it's the weekend. We're writing to let you know that your 24 hours will start "
+                        "**Welcome to FX Pip Pioneers!** As a welcome gift, we always give our new members "
+                        "**access to the Premium Signals channel for 24 hours.** However, the trading markets are currently closed, "
+                        "because it's the weekend, so we want to let you know that your 24 hours of free access will start "
                         "counting down from the moment the markets open again on Monday. This way, your welcome gift won't "
                         "be wasted on the weekend and you'll actually be able to make use of it."
                     )
@@ -624,54 +624,50 @@ def get_remaining_time_display(member_id: str) -> str:
 
         current_time = datetime.now(AMSTERDAM_TZ)
 
-        if data.get("weekend_delayed", False) and "expiry_time" in data:
-            # Weekend joiners have specific expiry time (Monday 23:59)
-            expiry_time = datetime.fromisoformat(data["expiry_time"])
-            if expiry_time.tzinfo is None:
-                if PYTZ_AVAILABLE:
-                    expiry_time = AMSTERDAM_TZ.localize(expiry_time)
-                else:
-                    expiry_time = expiry_time.replace(tzinfo=AMSTERDAM_TZ)
+        if data.get("weekend_delayed", False):
+            # For weekend delayed members, show time until activation or time since activation
+            activation_time = datetime.fromisoformat(
+                data.get("activation_time"))
+            if activation_time.tzinfo is None:
+                activation_time = activation_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
-                expiry_time = expiry_time.astimezone(AMSTERDAM_TZ)
-            
-            time_remaining = expiry_time - current_time
-            
-            if time_remaining.total_seconds() <= 0:
-                return "Expired"
-            
-            hours = int(time_remaining.total_seconds() // 3600)
-            minutes = int((time_remaining.total_seconds() % 3600) // 60)
-            seconds = int(time_remaining.total_seconds() % 60)
-            
-            return f"Weekend: {hours}h {minutes}m {seconds}s"
-            
+                activation_time = activation_time.astimezone(AMSTERDAM_TZ)
+
+            if current_time < activation_time:
+                # Not yet activated - show time until activation
+                time_until_activation = activation_time - current_time
+                hours = int(time_until_activation.total_seconds() // 3600)
+                minutes = int(
+                    (time_until_activation.total_seconds() % 3600) // 60)
+                seconds = int(time_until_activation.total_seconds() % 60)
+                return f"Activates in {hours}h {minutes}m {seconds}s"
+            else:
+                # Activated - show remaining time from activation
+                expiry_time = activation_time + timedelta(hours=24)
+                time_remaining = expiry_time - current_time
         else:
-            # Normal member - 24 hours from role_added_time
+            # Normal member - calculate from role_added_time
             role_added_time = datetime.fromisoformat(data["role_added_time"])
             if role_added_time.tzinfo is None:
-                if PYTZ_AVAILABLE:
-                    role_added_time = AMSTERDAM_TZ.localize(role_added_time)
-                else:
-                    role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
+                role_added_time = role_added_time.replace(tzinfo=AMSTERDAM_TZ)
             else:
                 role_added_time = role_added_time.astimezone(AMSTERDAM_TZ)
 
             expiry_time = role_added_time + timedelta(hours=24)
             time_remaining = expiry_time - current_time
 
-            if time_remaining.total_seconds() <= 0:
-                return "Expired"
+        if time_remaining.total_seconds() <= 0:
+            return "Expired"
 
-            hours = int(time_remaining.total_seconds() // 3600)
-            minutes = int((time_remaining.total_seconds() % 3600) // 60)
-            seconds = int(time_remaining.total_seconds() % 60)
+        hours = int(time_remaining.total_seconds() // 3600)
+        minutes = int((time_remaining.total_seconds() % 3600) // 60)
+        seconds = int(time_remaining.total_seconds() % 60)
 
-            return f"{hours}h {minutes}m {seconds}s"
+        return f"{hours}h {minutes}m {seconds}s"
 
     except Exception as e:
         print(f"Error calculating time for member {member_id}: {str(e)}")
-        return "ERROR"
+        return "Error"
 
 
 @bot.tree.command(
